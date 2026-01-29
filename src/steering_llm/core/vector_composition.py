@@ -12,6 +12,10 @@ import numpy as np
 
 from steering_llm.core.steering_vector import SteeringVector
 
+# Constants
+DEFAULT_CONFLICT_THRESHOLD = 0.7  # Cosine similarity threshold for conflict detection
+ORTHOGONALIZATION_EPSILON = 1e-8  # Small value to prevent division by zero
+
 
 class VectorComposition:
     """
@@ -154,7 +158,7 @@ class VectorComposition:
     @staticmethod
     def detect_conflicts(
         vectors: List[SteeringVector],
-        threshold: float = 0.7,
+        threshold: float = DEFAULT_CONFLICT_THRESHOLD,
     ) -> List[Tuple[int, int, float]]:
         """
         Detect conflicts between steering vectors via cosine similarity.
@@ -166,7 +170,8 @@ class VectorComposition:
         
         Args:
             vectors: List of SteeringVector instances to analyze
-            threshold: Similarity threshold for conflict detection (default: 0.7)
+            threshold: Similarity threshold for conflict detection 
+                       (default: 0.7 - empirically effective for steering)
         
         Returns:
             List of (idx1, idx2, similarity) tuples for conflicting pairs

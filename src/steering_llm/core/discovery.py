@@ -6,6 +6,7 @@ differences in model activations between positive and negative examples.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -15,8 +16,36 @@ from sklearn.preprocessing import StandardScaler
 from transformers import PreTrainedModel, PreTrainedTokenizer, AutoTokenizer
 
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import (
+    ActivationExtractionError,
+    EmptyDatasetError,
+    LayerDetectionError,
+)
 
 logger = logging.getLogger(__name__)
+
+# Constants for validation and defaults
+DEFAULT_BATCH_SIZE = 8
+DEFAULT_MAX_LENGTH = 128
+DEFAULT_PROBE_C = 1.0  # Regularization strength for linear probe
+DEFAULT_PROBE_MAX_ITER = 1000
+MAX_BATCH_SIZE = 128  # Guard against OOM
+MAX_SAMPLES = 100000  # Guard against excessive processing
+
+
+@dataclass
+class DiscoveryResult:
+    """
+    Result from discovery methods with optional metrics.
+    
+    This provides a consistent return type across all discovery methods.
+    
+    Attributes:
+        vector: The discovered steering vector
+        metrics: Optional dict of method-specific metrics (e.g., accuracy)
+    """
+    vector: SteeringVector
+    metrics: Optional[Dict[str, Any]] = None
 
 
 class Discovery:
@@ -35,10 +64,10 @@ class Discovery:
         layer: int,
         tokenizer: Optional[PreTrainedTokenizer] = None,
         model_name: Optional[str] = None,
-        batch_size: int = 8,
-        max_length: int = 128,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_length: int = DEFAULT_MAX_LENGTH,
         device: Optional[Union[str, torch.device]] = None,
-    ) -> SteeringVector:
+    ) -> DiscoveryResult:
         """
         Create steering vector using mean difference method.
         
@@ -60,30 +89,41 @@ class Discovery:
             device: Device to use (auto-detected if None)
         
         Returns:
-            SteeringVector instance
+            DiscoveryResult with SteeringVector and metrics
         
         Raises:
-            ValueError: If inputs are invalid or layer doesn't exist
-            RuntimeError: If activation extraction fails
+            EmptyDatasetError: If positive or negative list is empty
+            ValueError: If layer is invalid
+            ActivationExtractionError: If extraction fails
         
         Example:
             >>> from transformers import AutoModelForCausalLM
-            >>> model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-3B")
-            >>> vector = Discovery.mean_difference(
+            >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
+            >>> result = Discovery.mean_difference(
             ...     positive=["I love helping!", "You're amazing!"],
             ...     negative=["I hate this.", "You're terrible."],
             ...     model=model,
-            ...     layer=15
+            ...     layer=5
             ... )
+            >>> vector = result.vector
         """
         # Validate inputs
         if not positive:
-            raise ValueError("positive examples list cannot be empty")
+            raise EmptyDatasetError("positive")
         if not negative:
-            raise ValueError("negative examples list cannot be empty")
+            raise EmptyDatasetError("negative")
+        
+        # Guard against excessive data
+        if len(positive) > MAX_SAMPLES or len(negative) > MAX_SAMPLES:
+            logger.warning(
+                "Large dataset detected (%d/%d samples). Consider reducing size.",
+                len(positive), len(negative)
+            )
         
         if not isinstance(layer, int) or layer < 0:
             raise ValueError(f"layer must be non-negative integer, got {layer}")
+        
+        batch_size = min(batch_size, MAX_BATCH_SIZE)
         
         # Auto-detect tokenizer if not provided
         if tokenizer is None:
@@ -138,7 +178,7 @@ class Discovery:
         steering_vector = mean_pos - mean_neg
         
         # Create SteeringVector instance
-        return SteeringVector(
+        vector = SteeringVector(
             tensor=steering_vector.cpu(),
             layer=layer,
             layer_name=layer_name,
@@ -151,6 +191,8 @@ class Discovery:
                 "max_length": max_length,
             },
         )
+        
+        return DiscoveryResult(vector=vector, metrics=None)
     
     @staticmethod
     def _detect_layer_name(model: PreTrainedModel, layer: int) -> str:
@@ -165,7 +207,7 @@ class Discovery:
             Layer name (e.g., "model.layers.15")
         
         Raises:
-            ValueError: If layer cannot be detected
+            LayerDetectionError: If layer cannot be detected
         """
         # Common patterns for different architectures
         patterns = [
@@ -187,7 +229,7 @@ class Discovery:
             except AttributeError:
                 continue
 
-        raise ValueError(
+        raise LayerDetectionError(
             f"Cannot detect layer name for layer {layer}. "
             "Supported architectures: Llama, Mistral, Gemma, Phi, Qwen, GPT-2, "
             "GPT-J, GPT-NeoX, BLOOM, Falcon, OPT"
@@ -320,11 +362,11 @@ class Discovery:
         layer: int,
         tokenizer: Optional[PreTrainedTokenizer] = None,
         model_name: Optional[str] = None,
-        batch_size: int = 8,
-        max_length: int = 128,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_length: int = DEFAULT_MAX_LENGTH,
         device: Optional[Union[str, torch.device]] = None,
         num_pairs: Optional[int] = None,
-    ) -> SteeringVector:
+    ) -> DiscoveryResult:
         """
         Create steering vector using Contrastive Activation Addition (CAA).
         
@@ -348,27 +390,28 @@ class Discovery:
             num_pairs: Number of contrast pairs to use (None = use all)
         
         Returns:
-            SteeringVector instance with CAA-computed direction
+            DiscoveryResult with SteeringVector and metrics
         
         Raises:
-            ValueError: If inputs are invalid or sizes don't match
-            RuntimeError: If activation extraction fails
+            EmptyDatasetError: If positive or negative list is empty
+            ValueError: If sizes don't match
+            ActivationExtractionError: If extraction fails
         
         Example:
             >>> from transformers import AutoModelForCausalLM
-            >>> model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-3B")
-            >>> vector = Discovery.caa(
+            >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
+            >>> result = Discovery.caa(
             ...     positive=["I love helping!", "You're amazing!"],
             ...     negative=["I hate this.", "You're terrible."],
             ...     model=model,
-            ...     layer=15
+            ...     layer=5
             ... )
         """
         # Validate inputs
         if not positive:
-            raise ValueError("positive examples list cannot be empty")
+            raise EmptyDatasetError("positive")
         if not negative:
-            raise ValueError("negative examples list cannot be empty")
+            raise EmptyDatasetError("negative")
         
         if len(positive) != len(negative):
             raise ValueError(
@@ -435,7 +478,7 @@ class Discovery:
         steering_vector = torch.mean(contrasts, dim=0)
         
         # Create SteeringVector instance
-        return SteeringVector(
+        vector = SteeringVector(
             tensor=steering_vector.cpu(),
             layer=layer,
             layer_name=layer_name,
@@ -447,6 +490,8 @@ class Discovery:
                 "max_length": max_length,
             },
         )
+        
+        return DiscoveryResult(vector=vector, metrics=None)
     
     @staticmethod
     def linear_probe(
@@ -456,13 +501,13 @@ class Discovery:
         layer: int,
         tokenizer: Optional[PreTrainedTokenizer] = None,
         model_name: Optional[str] = None,
-        batch_size: int = 8,
-        max_length: int = 128,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        max_length: int = DEFAULT_MAX_LENGTH,
         device: Optional[Union[str, torch.device]] = None,
-        C: float = 1.0,
-        max_iter: int = 1000,
+        C: float = DEFAULT_PROBE_C,
+        max_iter: int = DEFAULT_PROBE_MAX_ITER,
         normalize: bool = True,
-    ) -> Tuple[SteeringVector, Dict[str, float]]:
+    ) -> DiscoveryResult:
         """
         Create steering vector using linear probing.
         
@@ -485,28 +530,28 @@ class Discovery:
             normalize: Whether to normalize activations before training
         
         Returns:
-            Tuple of (SteeringVector, metrics dict with 'train_accuracy')
+            DiscoveryResult with SteeringVector and metrics (including train_accuracy)
         
         Raises:
-            ValueError: If inputs are invalid
-            RuntimeError: If training fails
+            EmptyDatasetError: If positive or negative list is empty
+            ActivationExtractionError: If training fails
         
         Example:
             >>> from transformers import AutoModelForCausalLM
-            >>> model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-3B")
-            >>> vector, metrics = Discovery.linear_probe(
+            >>> model = AutoModelForCausalLM.from_pretrained("gpt2")
+            >>> result = Discovery.linear_probe(
             ...     positive=["I love helping!", "You're amazing!"],
             ...     negative=["I hate this.", "You're terrible."],
             ...     model=model,
-            ...     layer=15
+            ...     layer=5
             ... )
-            >>> print(f"Probe accuracy: {metrics['train_accuracy']:.2%}")
+            >>> print(f"Probe accuracy: {result.metrics['train_accuracy']:.2%}")
         """
         # Validate inputs
         if not positive:
-            raise ValueError("positive examples list cannot be empty")
+            raise EmptyDatasetError("positive")
         if not negative:
-            raise ValueError("negative examples list cannot be empty")
+            raise EmptyDatasetError("negative")
         
         if not isinstance(layer, int) or layer < 0:
             raise ValueError(f"layer must be non-negative integer, got {layer}")
@@ -577,7 +622,7 @@ class Discovery:
         try:
             probe.fit(X, y)
         except Exception as e:
-            raise RuntimeError(f"Linear probe training failed: {e}")
+            raise ActivationExtractionError(f"Linear probe training failed: {e}") from e
         
         # Extract probe weights as steering vector
         probe_weights = torch.from_numpy(probe.coef_[0]).float()
@@ -609,5 +654,5 @@ class Discovery:
             },
         )
         
-        return vector, metrics
+        return DiscoveryResult(vector=vector, metrics=metrics)
 

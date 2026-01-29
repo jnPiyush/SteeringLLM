@@ -6,7 +6,7 @@ Runtime LLM behavior modification through activation steering.
 
 SteeringLLM enables you to modify LLM behavior at inference time without retraining. Apply steering vectors to guide model outputs toward desired characteristics (e.g., more helpful, safer, more creative).
 
-**Phase 3: Production-ready agent integrations, safety benchmarks, and enterprise features.**
+**Status: Alpha (v0.1.0)** - Core functionality stable, agent integrations experimental.
 
 ## Quick Start
 
@@ -16,26 +16,27 @@ SteeringLLM enables you to modify LLM behavior at inference time without retrain
 from steering_llm import SteeringModel, Discovery
 
 # Load model
-model = SteeringModel.from_pretrained("meta-llama/Llama-3.2-3B")
+model = SteeringModel.from_pretrained("gpt2")  # Or any supported model
 
 # Create steering vector from contrast examples
-vector = Discovery.mean_difference(
+result = Discovery.mean_difference(
     positive=["I love helping people!", "You're amazing!"],
     negative=["I hate this.", "You're terrible."],
-    model=model.model,
-    layer=15
+    model=model.model,  # Pass the underlying HF model
+    layer=6
 )
+vector = result.vector
 
 # Generate with steering
 output = model.generate_with_steering(
     "Tell me about yourself",
     vector=vector,
     alpha=2.0,
-    max_length=100
+    max_new_tokens=50
 )
 ```
 
-### Agent Framework Integration (Phase 3) ✨
+### Agent Framework Integration ✨
 
 ```python
 from steering_llm.agents import LangChainSteeringLLM, AzureSteeringAgent, LlamaIndexSteeringLLM
@@ -54,7 +55,7 @@ prompt = PromptTemplate(input_variables=["topic"], template="Explain {topic}")
 chain = LLMChain(llm=llm, prompt=prompt)
 result = chain.run(topic="AI safety")
 
-# Microsoft Agent Framework
+# Azure Integration (requires azure extras)
 agent = AzureSteeringAgent(
     steering_model=model,
     agent_name="helpful_assistant",
@@ -109,38 +110,40 @@ report = evaluator.evaluate_custom(
 report.save(Path("evaluation_results/safety_report.json"))
 ```
 
-### Advanced Discovery Methods (Phase 2)
+### Advanced Discovery Methods
 
 ```python
 # CAA (Contrastive Activation Addition) - Stronger steering
-vector = Discovery.caa(
+result = Discovery.caa(
     positive=["I love helping!", "You're amazing!"],
     negative=["I hate this.", "You're terrible."],
     model=model.model,
-    layer=15
+    layer=6
 )
+vector = result.vector
 
 # Linear Probing - Interpretable feature extraction
-vector, metrics = Discovery.linear_probe(
+result = Discovery.linear_probe(
     positive=["I love helping!", "You're amazing!"],
     negative=["I hate this.", "You're terrible."],
     model=model.model,
-    layer=15
+    layer=6
 )
-print(f"Probe accuracy: {metrics['train_accuracy']:.2%}")
+vector = result.vector
+print(f"Probe accuracy: {result.metrics['train_accuracy']:.2%}")
 ```
 
-### Multi-Vector Composition (Phase 2)
+### Multi-Vector Composition
 
 ```python
 from steering_llm import VectorComposition
 
 # Combine multiple steering vectors
-politeness_vec = Discovery.mean_difference(...)
-conciseness_vec = Discovery.mean_difference(...)
+politeness_result = Discovery.mean_difference(...)
+conciseness_result = Discovery.mean_difference(...)
 
 combined = VectorComposition.weighted_sum(
-    vectors=[politeness_vec, conciseness_vec],
+    vectors=[politeness_result.vector, conciseness_result.vector],
     weights=[0.7, 0.3],
     normalize=True
 )
@@ -263,7 +266,7 @@ model = SteeringModel.from_pretrained(
 )
 ```
 
-### Device Support70+ comprehensive tests:
+## Testing
 
 ```bash
 # Run all tests
@@ -272,27 +275,18 @@ pytest
 # Run specific test suite
 pytest tests/test_discovery_advanced.py
 pytest tests/test_vector_composition.py
-pytest tests/agents/test_base.py
-pytest tests/evaluation/test_metrics.py
 
 # Run with coverage report
 pytest --cov=steering_llm --cov-report=html
 
 # Skip slow integration tests
 pytest -m "not slow"
+
+# Run only integration tests
+pytest -m integration
 ```
 
-### Test Coverage
-- **Core**: 132 tests (Phase 1 & 2)
-- **Agents**: 20+ tests (Phase 3)
-- **Evaluation**: 18+ tests (Phase 3)
-- **Total**: 170+ tests, 95%+ coverage
-## Testing
-
-The project maintains 95%+ test coverage with 132 comprehensive tests:
-
-```bash
-# RContributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
@@ -307,25 +301,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 - **Architecture**: [docs/adr/ADR-001-steeringllm-architecture.md](docs/adr/ADR-001-steeringllm-architecture.md)
 - **API Reference**: [docs/API-REFERENCE.md](docs/API-REFERENCE.md)
-- **Project Setup**: [docs/project-setup.md](docs/project-setup.md)
-
-## Roadmap
-
-- ✅ **Phase 1**: Core steering primitives and HuggingFace integration
-- ✅ **Phase 2**: Advanced discovery (CAA, probing) and vector composition
-- ✅ **Phase 3**: Agent integrations, safety benchmarks, evaluation
-- 🚧 **Phase 4**: Performance optimization, caching, distributed steering
-# Run with coverage report
-pytest --cov=steering_llm --cov-report=html
-```
-
-## Architecture
-
-See [docs/adr/ADR-001-steeringllm-architecture.md](docs/adr/ADR-001-steeringllm-architecture.md) for architectural decisions.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+- **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 ## License
 

@@ -7,8 +7,9 @@ import pytest
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
-from steering_llm.core.discovery import Discovery
+from steering_llm.core.discovery import Discovery, DiscoveryResult
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import EmptyDatasetError
 
 
 class TestCAAValidation:
@@ -18,7 +19,7 @@ class TestCAAValidation:
         """Test error when positive list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="positive examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.caa(
                 positive=[],
                 negative=["negative"],
@@ -30,7 +31,7 @@ class TestCAAValidation:
         """Test error when negative list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="negative examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.caa(
                 positive=["positive"],
                 negative=[],
@@ -68,10 +69,10 @@ class TestCAAIntegration:
     
     @patch("steering_llm.core.discovery.AutoTokenizer")
     @patch("steering_llm.core.discovery.Discovery._extract_activations")
-    def test_caa_returns_steering_vector(
+    def test_caa_returns_discovery_result(
         self, mock_extract: MagicMock, mock_tokenizer_class: MagicMock
     ) -> None:
-        """Test that CAA returns a valid SteeringVector."""
+        """Test that CAA returns a valid DiscoveryResult."""
         hidden_dim = 100
         layer = 5
         
@@ -107,7 +108,7 @@ class TestCAAIntegration:
         positive = ["pos1", "pos2"]
         negative = ["neg1", "neg2"]
         
-        vector = Discovery.caa(
+        result = Discovery.caa(
             positive=positive,
             negative=negative,
             model=model,
@@ -115,6 +116,8 @@ class TestCAAIntegration:
         )
         
         # Verify result
+        assert isinstance(result, DiscoveryResult)
+        vector = result.vector
         assert isinstance(vector, SteeringVector)
         assert vector.layer == layer
         assert vector.method == "caa"
@@ -184,7 +187,7 @@ class TestCAAIntegration:
         positive = [f"pos{i}" for i in range(5)]
         negative = [f"neg{i}" for i in range(5)]
         
-        vector = Discovery.caa(
+        result = Discovery.caa(
             positive=positive,
             negative=negative,
             model=model,
@@ -193,7 +196,7 @@ class TestCAAIntegration:
         )
         
         # Verify only 2 pairs were used
-        assert vector.metadata["contrast_pairs"] == 2
+        assert result.vector.metadata["contrast_pairs"] == 2
 
 
 class TestLinearProbeValidation:
@@ -203,7 +206,7 @@ class TestLinearProbeValidation:
         """Test error when positive list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="positive examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.linear_probe(
                 positive=[],
                 negative=["negative"],
@@ -215,7 +218,7 @@ class TestLinearProbeValidation:
         """Test error when negative list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="negative examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.linear_probe(
                 positive=["positive"],
                 negative=[],
@@ -292,14 +295,18 @@ class TestLinearProbeIntegration:
         positive = [f"pos{i}" for i in range(10)]
         negative = [f"neg{i}" for i in range(10)]
         
-        vector, metrics = Discovery.linear_probe(
+        result = Discovery.linear_probe(
             positive=positive,
             negative=negative,
             model=model,
             layer=layer,
         )
         
-        # Verify vector
+        # Verify result
+        assert isinstance(result, DiscoveryResult)
+        vector = result.vector
+        metrics = result.metrics
+        
         assert isinstance(vector, SteeringVector)
         assert vector.layer == layer
         assert vector.method == "linear_probe"
@@ -382,7 +389,7 @@ class TestLinearProbeIntegration:
         positive = [f"pos{i}" for i in range(2)]
         negative = [f"neg{i}" for i in range(2)]
         
-        vector, metrics = Discovery.linear_probe(
+        result = Discovery.linear_probe(
             positive=positive,
             negative=negative,
             model=model,
@@ -391,6 +398,8 @@ class TestLinearProbeIntegration:
         )
         
         # Verify normalization flag in metadata
+        vector = result.vector
+        metrics = result.metrics
         assert metrics["normalized"] is False
         assert isinstance(vector, SteeringVector)
 
@@ -453,13 +462,14 @@ class TestDiscoveryMethodComparison:
         
         target_module.register_forward_hook = mock_register_hook_md
         
-        vec_md = Discovery.mean_difference(
+        result_md = Discovery.mean_difference(
             positive=positive,
             negative=negative,
             model=model,
             layer=layer,
         )
         
+        vec_md = result_md.vector
         assert isinstance(vec_md, SteeringVector)
         assert vec_md.method == "mean_difference"
         
@@ -483,13 +493,14 @@ class TestDiscoveryMethodComparison:
         
         target_module.register_forward_hook = mock_register_hook_caa
         
-        vec_caa = Discovery.caa(
+        result_caa = Discovery.caa(
             positive=positive,
             negative=negative,
             model=model,
             layer=layer,
         )
         
+        vec_caa = result_caa.vector
         assert isinstance(vec_caa, SteeringVector)
         assert vec_caa.method == "caa"
         
@@ -517,13 +528,15 @@ class TestDiscoveryMethodComparison:
         
         target_module.register_forward_hook = mock_register_hook_lp
         
-        vec_lp, metrics_lp = Discovery.linear_probe(
+        result_lp = Discovery.linear_probe(
             positive=positive,
             negative=negative,
             model=model,
             layer=layer,
         )
         
+        vec_lp = result_lp.vector
+        metrics_lp = result_lp.metrics
         assert isinstance(vec_lp, SteeringVector)
         assert vec_lp.method == "linear_probe"
         assert "train_accuracy" in metrics_lp

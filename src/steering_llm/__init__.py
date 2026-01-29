@@ -8,16 +8,65 @@ LLM behavior at inference time without retraining.
 __version__ = "0.1.0"
 
 from steering_llm.core.steering_vector import SteeringVector
-from steering_llm.core.discovery import Discovery
-from steering_llm.core.steering_model import SteeringModel, ActivationHook
+from steering_llm.core.discovery import Discovery, DiscoveryResult
+from steering_llm.core.steering_model import (
+    SteeringModel,
+    ActivationHook,
+    register_architecture,
+    get_supported_architectures,
+)
 from steering_llm.core.vector_composition import VectorComposition
 
+# Export exceptions for user error handling
+from steering_llm.exceptions import (
+    SteeringLLMError,
+    ConfigurationError,
+    ModelError,
+    UnsupportedArchitectureError,
+    ModelLoadError,
+    LayerError,
+    InvalidLayerError,
+    LayerDetectionError,
+    VectorError,
+    IncompatibleVectorError,
+    InvalidVectorError,
+    SteeringError,
+    SteeringActiveError,
+    DiscoveryError,
+    EmptyDatasetError,
+    ActivationExtractionError,
+    DependencyError,
+)
+
 __all__ = [
+    # Core classes
     "SteeringVector",
     "Discovery",
+    "DiscoveryResult",
     "SteeringModel",
     "ActivationHook",
     "VectorComposition",
+    # Utility functions
+    "register_architecture",
+    "get_supported_architectures",
+    # Exceptions
+    "SteeringLLMError",
+    "ConfigurationError",
+    "ModelError",
+    "UnsupportedArchitectureError",
+    "ModelLoadError",
+    "LayerError",
+    "InvalidLayerError",
+    "LayerDetectionError",
+    "VectorError",
+    "IncompatibleVectorError",
+    "InvalidVectorError",
+    "SteeringError",
+    "SteeringActiveError",
+    "DiscoveryError",
+    "EmptyDatasetError",
+    "ActivationExtractionError",
+    "DependencyError",
 ]
 
 # Optional: Import agent framework integrations if available

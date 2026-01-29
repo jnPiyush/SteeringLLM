@@ -16,11 +16,18 @@ from transformers import (
 )
 
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import (
+    IncompatibleVectorError,
+    InvalidLayerError,
+    ModelLoadError,
+    SteeringActiveError,
+    UnsupportedArchitectureError,
+)
 
 
 # Model architecture registry: maps model_type to (parent_module, layers_attr)
 # This allows flexible layer detection across different architectures
-MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
+_MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
     # Llama family (Llama 2, Llama 3, Code Llama)
     "llama": ("model", "layers"),
     # Mistral family (Mistral, Mixtral)
@@ -46,6 +53,26 @@ MODEL_REGISTRY: Dict[str, Tuple[str, str]] = {
     # Falcon
     "falcon": ("transformer", "h"),
 }
+
+
+def get_supported_architectures() -> List[str]:
+    """Return list of supported model architectures."""
+    return sorted(_MODEL_REGISTRY.keys())
+
+
+def register_architecture(model_type: str, parent_path: str, layers_attr: str) -> None:
+    """
+    Register a custom model architecture for steering support.
+    
+    Args:
+        model_type: The model_type from model.config (e.g., "custom_llm")
+        parent_path: Dot-separated path to parent module (e.g., "model.encoder")
+        layers_attr: Attribute name containing layers list (e.g., "layers")
+    
+    Example:
+        >>> register_architecture("my_custom_model", "backbone", "blocks")
+    """
+    _MODEL_REGISTRY[model_type] = (parent_path, layers_attr)
 
 
 class ActivationHook:
@@ -78,7 +105,7 @@ class ActivationHook:
     def register(self) -> None:
         """Register the forward hook on the target module."""
         if self.handle is not None:
-            raise RuntimeError("Hook already registered. Remove before re-registering.")
+            raise SteeringActiveError(self.vector.layer)
         
         def hook_fn(module: torch.nn.Module, input: Any, output: Any) -> Any:
             """
@@ -210,7 +237,7 @@ class SteeringModel:
         try:
             hf_model = AutoModelForCausalLM.from_pretrained(model_name, **kwargs)
         except Exception as e:
-            raise RuntimeError(f"Failed to load model {model_name}: {e}") from e
+            raise ModelLoadError(f"Failed to load model {model_name}: {e}") from e
         
         # Load tokenizer
         tokenizer_name = tokenizer_name or model_name
@@ -220,20 +247,13 @@ class SteeringModel:
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
         except Exception as e:
-            raise RuntimeError(f"Failed to load tokenizer {tokenizer_name}: {e}") from e
+            raise ModelLoadError(f"Failed to load tokenizer {tokenizer_name}: {e}") from e
         
         # Validate architecture support
         model_type = getattr(hf_model.config, "model_type", None)
         
-        if model_type not in MODEL_REGISTRY:
-            # Provide helpful error with all supported types
-            supported_list = sorted(MODEL_REGISTRY.keys())
-            raise ValueError(
-                f"Unsupported model architecture: '{model_type}'. "
-                f"Supported architectures ({len(supported_list)}): {', '.join(supported_list)}. "
-                f"If you believe this model should be supported, please open an issue at "
-                f"https://github.com/jnPiyush/SteeringLLM/issues with the model name and architecture."
-            )
+        if model_type not in _MODEL_REGISTRY:
+            raise UnsupportedArchitectureError(model_type, list(_MODEL_REGISTRY.keys()))
         
         return cls(model=hf_model, tokenizer=tokenizer)
     
@@ -241,14 +261,14 @@ class SteeringModel:
         """
         Detect and cache layer modules from model architecture.
         
-        Uses MODEL_REGISTRY to find layers based on model_type. This allows
+        Uses _MODEL_REGISTRY to find layers based on model_type. This allows
         support for diverse architectures without hardcoding patterns.
         
         Returns:
             Dict mapping layer index to module
         
         Raises:
-            ValueError: If layers cannot be detected
+            UnsupportedArchitectureError: If model architecture is not supported
         """
         if self._layer_modules is not None:
             return self._layer_modules
@@ -257,21 +277,13 @@ class SteeringModel:
         model_type = getattr(self.model.config, "model_type", None)
         
         if model_type is None:
-            raise ValueError(
-                "Cannot detect model_type from model.config. "
-                "Please ensure the model is a valid HuggingFace model."
-            )
+            raise UnsupportedArchitectureError("unknown", list(_MODEL_REGISTRY.keys()))
         
         # Look up architecture pattern in registry
-        if model_type not in MODEL_REGISTRY:
-            supported_list = sorted(MODEL_REGISTRY.keys())
-            raise ValueError(
-                f"Unsupported model_type: '{model_type}'. "
-                f"Supported: {', '.join(supported_list)}. "
-                f"Please open an issue to request support for this architecture."
-            )
+        if model_type not in _MODEL_REGISTRY:
+            raise UnsupportedArchitectureError(model_type, list(_MODEL_REGISTRY.keys()))
         
-        parent_path, layers_attr = MODEL_REGISTRY[model_type]
+        parent_path, layers_attr = _MODEL_REGISTRY[model_type]
         
         # Navigate to parent module
         try:
@@ -279,26 +291,19 @@ class SteeringModel:
             for attr in parent_path.split("."):
                 parent_module = getattr(parent_module, attr)
         except AttributeError as e:
-            raise ValueError(
-                f"Cannot navigate to {parent_path} for model_type '{model_type}'. "
-                f"Model structure may have changed. Error: {e}"
+            raise UnsupportedArchitectureError(
+                model_type, list(_MODEL_REGISTRY.keys())
             ) from e
         
         # Get layers from parent module
         if not hasattr(parent_module, layers_attr):
-            raise ValueError(
-                f"Module '{parent_path}' does not have attribute '{layers_attr}' "
-                f"for model_type '{model_type}'. Model structure may have changed."
-            )
+            raise UnsupportedArchitectureError(model_type, list(_MODEL_REGISTRY.keys()))
         
         layers = getattr(parent_module, layers_attr)
         self._layer_modules = {i: layer for i, layer in enumerate(layers)}
         
         if not self._layer_modules:
-            raise ValueError(
-                f"No layers found at {parent_path}.{layers_attr}. "
-                "Model may not be properly initialized."
-            )
+            raise UnsupportedArchitectureError(model_type, list(_MODEL_REGISTRY.keys()))
         
         return self._layer_modules
     
@@ -313,15 +318,12 @@ class SteeringModel:
             Layer module
         
         Raises:
-            ValueError: If layer index is invalid
+            InvalidLayerError: If layer index is invalid
         """
         layers = self._detect_layers()
         
         if layer not in layers:
-            raise ValueError(
-                f"Invalid layer index {layer}. "
-                f"Model has {len(layers)} layers (0-{len(layers)-1})"
-            )
+            raise InvalidLayerError(layer, len(layers))
         
         return layers[layer]
     
@@ -338,8 +340,8 @@ class SteeringModel:
             alpha: Steering strength multiplier (0.0 = no effect, 2.0 = double)
         
         Raises:
-            ValueError: If vector is incompatible with model
-            RuntimeError: If steering already applied to this layer
+            IncompatibleVectorError: If vector is incompatible with model
+            SteeringActiveError: If steering already applied to this layer
         
         Example:
             >>> model.apply_steering(safety_vector, alpha=1.5)
@@ -351,25 +353,15 @@ class SteeringModel:
         # Check if steering already active on this layer
         layer_key = f"layer_{vector.layer}"
         if layer_key in self.active_hooks:
-            raise RuntimeError(
-                f"Steering already active on layer {vector.layer}. "
-                "Remove existing steering before applying new vector."
-            )
+            raise SteeringActiveError(vector.layer)
         
         # Get target layer module
-        try:
-            module = self._get_layer_module(vector.layer)
-        except ValueError as e:
-            raise ValueError(f"Cannot apply steering: {e}") from e
+        module = self._get_layer_module(vector.layer)
         
         # Validate vector dimensions
-        # Get expected hidden dimension from model config
         hidden_dim = self.model.config.hidden_size
         if vector.tensor.shape[0] != hidden_dim:
-            raise ValueError(
-                f"Vector dimension mismatch: vector has {vector.tensor.shape[0]}, "
-                f"but model expects {hidden_dim}"
-            )
+            raise IncompatibleVectorError(vector.tensor.shape[0], hidden_dim)
         
         # Create and register hook
         hook = ActivationHook(module=module, vector=vector, alpha=alpha)
@@ -420,10 +412,7 @@ class SteeringModel:
         for vector in vectors:
             layer_key = f"layer_{vector.layer}"
             if layer_key in self.active_hooks:
-                raise RuntimeError(
-                    f"Steering already active on layer {vector.layer}. "
-                    "Remove existing steering before applying new vectors."
-                )
+                raise SteeringActiveError(vector.layer)
         
         # Apply all vectors
         for vector, alpha in zip(vectors, alphas):
@@ -616,18 +605,33 @@ class SteeringModel:
 
         return outputs[0] if is_single else outputs
     
-    def __getattr__(self, name: str) -> Any:
-        """
-        Delegate attribute access to underlying model.
-        
-        This allows SteeringModel to be used as a drop-in replacement
-        for the wrapped HuggingFace model.
-        """
-        # Avoid infinite recursion
-        if name in {"model", "tokenizer", "active_hooks", "_layer_modules"}:
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-        
-        return getattr(self.model, name)
+    # Explicit delegation methods for common model attributes
+    # This is preferred over __getattr__ for better IDE support and safety
+    
+    @property
+    def config(self) -> Any:
+        """Access the model's configuration."""
+        return self.model.config
+    
+    @property
+    def dtype(self) -> torch.dtype:
+        """Get the model's dtype."""
+        return self.model.dtype
+    
+    def eval(self) -> "SteeringModel":
+        """Set model to evaluation mode."""
+        self.model.eval()
+        return self
+    
+    def train(self, mode: bool = True) -> "SteeringModel":
+        """Set model to training mode."""
+        self.model.train(mode)
+        return self
+    
+    def to(self, device: Union[str, torch.device]) -> "SteeringModel":
+        """Move model to device."""
+        self.model.to(device)
+        return self
     
     def __repr__(self) -> str:
         """String representation of SteeringModel."""

@@ -6,6 +6,7 @@ from unittest.mock import Mock, MagicMock, patch
 
 from steering_llm.core.steering_model import SteeringModel
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import SteeringActiveError
 
 
 class TestApplyMultipleSteering:
@@ -169,7 +170,7 @@ class TestApplyMultipleSteering:
             model_name="test-model",
         )
         
-        with pytest.raises(RuntimeError, match="Steering already active on layer"):
+        with pytest.raises(SteeringActiveError, match="Steering already active on layer"):
             steering_model.apply_multiple_steering(vectors=[vec2])
     
     def test_apply_multiple_steering_five_vectors(self) -> None:

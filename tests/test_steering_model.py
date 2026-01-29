@@ -6,6 +6,13 @@ from unittest.mock import Mock, MagicMock, patch
 
 from steering_llm.core.steering_model import SteeringModel, ActivationHook
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import (
+    SteeringActiveError,
+    UnsupportedArchitectureError,
+    ModelLoadError,
+    InvalidLayerError,
+    IncompatibleVectorError,
+)
 
 
 class TestActivationHook:
@@ -62,7 +69,7 @@ class TestActivationHook:
         hook = ActivationHook(module=module, vector=vector, alpha=1.0)
         hook.register()
         
-        with pytest.raises(RuntimeError, match="Hook already registered"):
+        with pytest.raises(SteeringActiveError):
             hook.register()
     
     def test_remove_hook(self) -> None:
@@ -243,7 +250,7 @@ class TestSteeringModelLoading:
         mock_tokenizer.pad_token = "<pad>"
         mock_tokenizer_cls.from_pretrained.return_value = mock_tokenizer
         
-        with pytest.raises(ValueError, match="Unsupported model architecture"):
+        with pytest.raises(UnsupportedArchitectureError):
             SteeringModel.from_pretrained("bert-base-uncased")
     
     @patch("steering_llm.core.steering_model.AutoModelForCausalLM")
@@ -251,7 +258,7 @@ class TestSteeringModelLoading:
         """Test that model loading failure raises error."""
         mock_model_cls.from_pretrained.side_effect = Exception("Network error")
         
-        with pytest.raises(RuntimeError, match="Failed to load model"):
+        with pytest.raises(ModelLoadError):
             SteeringModel.from_pretrained("nonexistent/model")
 
 
@@ -315,7 +322,7 @@ class TestLayerDetection:
         
         steering_model = SteeringModel(model=mock_model)
         
-        with pytest.raises(ValueError, match="Invalid layer index"):
+        with pytest.raises(InvalidLayerError):
             steering_model._get_layer_module(10)
 
 
@@ -368,7 +375,7 @@ class TestApplySteering:
             model_name="test-model",
         )
         
-        with pytest.raises(ValueError, match="Vector dimension mismatch"):
+        with pytest.raises(IncompatibleVectorError):
             steering_model.apply_steering(vector)
     
     def test_apply_steering_already_active(self) -> None:
@@ -394,7 +401,7 @@ class TestApplySteering:
         steering_model.apply_steering(vector)
         
         # Try to apply again
-        with pytest.raises(RuntimeError, match="Steering already active"):
+        with pytest.raises(SteeringActiveError):
             steering_model.apply_steering(vector)
     
     def test_apply_steering_invalid_alpha(self) -> None:
@@ -761,30 +768,39 @@ class TestSteeringModelHelpers:
         """Test that attributes are delegated to underlying model."""
         mock_model = Mock()
         mock_model.config = Mock()
-        mock_model.some_method = Mock(return_value="result")
         
         steering_model = SteeringModel(model=mock_model)
         
-        # Should delegate to underlying model
-        result = steering_model.some_method()
-        assert result == "result"
-        assert mock_model.some_method.called
+        # Should access config through explicit property
+        config = steering_model.config
+        assert config is mock_model.config
 
 
 class TestModelRegistry:
-    """Tests for MODEL_REGISTRY and extended architecture support."""
+    """Tests for _MODEL_REGISTRY and extended architecture support."""
     
-    def test_model_registry_contains_extended_models(self) -> None:
-        """Test that MODEL_REGISTRY includes new architectures."""
-        from steering_llm.core.steering_model import MODEL_REGISTRY
+    def test_get_supported_architectures(self) -> None:
+        """Test that get_supported_architectures returns expected models."""
+        from steering_llm.core.steering_model import get_supported_architectures
+        
+        supported = get_supported_architectures()
         
         # Verify extended models are present
-        assert "gemma2" in MODEL_REGISTRY
-        assert "phi3" in MODEL_REGISTRY
-        assert "qwen2" in MODEL_REGISTRY
-        assert "gpt2" in MODEL_REGISTRY
-        assert "bloom" in MODEL_REGISTRY
-        assert "falcon" in MODEL_REGISTRY
+        assert "gemma2" in supported
+        assert "phi3" in supported
+        assert "qwen2" in supported
+        assert "gpt2" in supported
+        assert "bloom" in supported
+        assert "falcon" in supported
+    
+    def test_register_architecture(self) -> None:
+        """Test registering a custom architecture."""
+        from steering_llm.core.steering_model import register_architecture, get_supported_architectures
+        
+        # Register custom
+        register_architecture("test_custom", "encoder", "blocks")
+        
+        assert "test_custom" in get_supported_architectures()
     
     @patch("steering_llm.core.steering_model.AutoModelForCausalLM")
     @patch("steering_llm.core.steering_model.AutoTokenizer")
@@ -862,7 +878,7 @@ class TestModelRegistry:
         
         steering_model = SteeringModel(model=mock_model)
         
-        with pytest.raises(ValueError, match="Unsupported model_type"):
+        with pytest.raises(UnsupportedArchitectureError):
             steering_model._detect_layers()
     
     def test_detect_layers_better_error_message(self) -> None:
@@ -872,7 +888,7 @@ class TestModelRegistry:
         
         steering_model = SteeringModel(model=mock_model)
         
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(UnsupportedArchitectureError) as exc_info:
             steering_model._detect_layers()
         
         # Error should list some supported architectures

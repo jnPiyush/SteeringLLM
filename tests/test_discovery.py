@@ -6,8 +6,9 @@ import pytest
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizer
 
-from steering_llm.core.discovery import Discovery
+from steering_llm.core.discovery import Discovery, DiscoveryResult
 from steering_llm.core.steering_vector import SteeringVector
+from steering_llm.exceptions import EmptyDatasetError, LayerDetectionError
 
 
 class TestMeanDifferenceValidation:
@@ -17,7 +18,7 @@ class TestMeanDifferenceValidation:
         """Test error when positive list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="positive examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.mean_difference(
                 positive=[],
                 negative=["negative example"],
@@ -29,7 +30,7 @@ class TestMeanDifferenceValidation:
         """Test error when negative list is empty."""
         model = MagicMock(spec=PreTrainedModel)
         
-        with pytest.raises(ValueError, match="negative examples list cannot be empty"):
+        with pytest.raises(EmptyDatasetError):
             Discovery.mean_difference(
                 positive=["positive example"],
                 negative=[],
@@ -81,7 +82,7 @@ class TestLayerDetection:
         model.model = MagicMock()
         model.model.layers = [MagicMock() for _ in range(10)]
         
-        with pytest.raises(ValueError, match="Cannot detect layer name"):
+        with pytest.raises(LayerDetectionError, match="Cannot detect layer name"):
             Discovery._detect_layer_name(model, 20)
 
 
@@ -285,14 +286,16 @@ class TestMeanDifferenceIntegration:
         positive = ["I love this"]
         negative = ["I hate this"]
         
-        vector = Discovery.mean_difference(
+        result = Discovery.mean_difference(
             positive=positive,
             negative=negative,
             model=model,
             layer=layer,
         )
         
-        # Verify result is a SteeringVector
+        # Verify result is a DiscoveryResult with SteeringVector
+        assert isinstance(result, DiscoveryResult)
+        vector = result.vector
         assert isinstance(vector, SteeringVector)
         assert vector.layer == layer
         assert vector.model_name == "test-model"
@@ -366,7 +369,7 @@ class TestMeanDifferenceIntegration:
         positive = [f"positive {i}" for i in range(4)]
         negative = [f"negative {i}" for i in range(4)]
         
-        vector = Discovery.mean_difference(
+        result = Discovery.mean_difference(
             positive=positive,
             negative=negative,
             model=model,
@@ -375,6 +378,7 @@ class TestMeanDifferenceIntegration:
         )
         
         # Verify
+        vector = result.vector
         assert vector.metadata["positive_samples"] == 4
         assert vector.metadata["negative_samples"] == 4
         
@@ -424,7 +428,7 @@ class TestMeanDifferenceIntegration:
         
         # Call with provided tokenizer (should NOT call AutoTokenizer)
         with patch("steering_llm.core.discovery.AutoTokenizer") as mock_auto:
-            vector = Discovery.mean_difference(
+            result = Discovery.mean_difference(
                 positive=["positive"],
                 negative=["negative"],
                 model=model,
