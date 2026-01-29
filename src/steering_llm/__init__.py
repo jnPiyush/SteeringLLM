@@ -19,3 +19,17 @@ __all__ = [
     "ActivationHook",
     "VectorComposition",
 ]
+
+# Optional: Import agent framework integrations if available
+try:
+    from steering_llm import agents
+    __all__.append("agents")
+except ImportError:
+    pass
+
+# Optional: Import evaluation framework if available
+try:
+    from steering_llm import evaluation
+    __all__.append("evaluation")
+except ImportError:
+    pass

@@ -34,9 +34,36 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Agent framework integrations
+agents = [
+    "langchain>=0.1.0",
+    "llama-index>=0.10.0",
+]
+
+# Azure/Microsoft integrations  
+azure = [
+    "agent-framework>=0.1.0",
+    "azure-monitor-opentelemetry>=1.0.0",
+]
+
+# Evaluation and benchmarks
+evaluation = [
+    "datasets>=2.14.0",
+]
+
+# All optional dependencies
+all = [
+    "langchain>=0.1.0",
+    "llama-index>=0.10.0",
+    "agent-framework>=0.1.0",
+    "azure-monitor-opentelemetry>=1.0.0",
+    "datasets>=2.14.0",
+]
+
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.5.0",

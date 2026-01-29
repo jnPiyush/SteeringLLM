@@ -6,6 +6,8 @@ Runtime LLM behavior modification through activation steering.
 
 SteeringLLM enables you to modify LLM behavior at inference time without retraining. Apply steering vectors to guide model outputs toward desired characteristics (e.g., more helpful, safer, more creative).
 
+**Phase 3: Production-ready agent integrations, safety benchmarks, and enterprise features.**
+
 ## Quick Start
 
 ### Basic Steering
@@ -31,6 +33,80 @@ output = model.generate_with_steering(
     alpha=2.0,
     max_length=100
 )
+```
+
+### Agent Framework Integration (Phase 3) ✨
+
+```python
+from steering_llm.agents import LangChainSteeringLLM, AzureSteeringAgent, LlamaIndexSteeringLLM
+
+# LangChain Integration
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+
+llm = LangChainSteeringLLM(
+    steering_model=model,
+    vectors=[safety_vector],
+    alpha=2.0
+)
+
+prompt = PromptTemplate(input_variables=["topic"], template="Explain {topic}")
+chain = LLMChain(llm=llm, prompt=prompt)
+result = chain.run(topic="AI safety")
+
+# Microsoft Agent Framework
+agent = AzureSteeringAgent(
+    steering_model=model,
+    agent_name="helpful_assistant",
+    vectors=[helpful_vector],
+    enable_tracing=True  # Azure Monitor integration
+)
+response = agent.generate("How can I help you?")
+
+# LlamaIndex RAG
+from llama_index.core import VectorStoreIndex
+
+llm = LlamaIndexSteeringLLM(
+    steering_model=model,
+    vectors=[domain_vector],
+    alpha=1.5
+)
+index = VectorStoreIndex.from_documents(documents)
+query_engine = index.as_query_engine(llm=llm)
+response = query_engine.query("What is this about?")
+```
+
+### Safety Evaluation (Phase 3) ✨
+
+```python
+from steering_llm.evaluation import SteeringEvaluator, ToxicityMetric
+
+# Create evaluator
+evaluator = SteeringEvaluator(
+    model=model,
+    vectors=[safety_vector],
+    alpha=2.0
+)
+
+# Evaluate on ToxiGen benchmark
+report = evaluator.evaluate_toxigen(num_samples=100)
+print(f"Toxicity reduction: {report.comparison.effectiveness:.2%}")
+
+# Evaluate on RealToxicityPrompts
+report = evaluator.evaluate_realtoxicity(
+    num_samples=100,
+    min_prompt_toxicity=0.5
+)
+
+# Custom evaluation
+prompts = ["Your custom prompts here"]
+report = evaluator.evaluate_custom(
+    prompts=prompts,
+    additional_metrics={"domain": domain_metric}
+)
+
+# Save report
+report.save(Path("evaluation_results/safety_report.json"))
 ```
 
 ### Advanced Discovery Methods (Phase 2)
@@ -90,7 +166,20 @@ model.apply_multiple_steering(
 ## Installation
 
 ```bash
+# Base installation
 pip install steering-llm
+
+# With agent integrations
+pip install steering-llm[agents]
+
+# With Azure/Microsoft features
+pip install steering-llm[azure]
+
+# With evaluation benchmarks
+pip install steering-llm[evaluation]
+
+# Everything
+pip install steering-llm[all]
 ```
 
 ### Development Installation
@@ -98,7 +187,7 @@ pip install steering-llm
 ```bash
 git clone https://github.com/jnPiyush/SteeringLLM.git
 cd SteeringLLM
-pip install -e ".[dev]"
+pip install -e ".[dev,all]"
 ```
 
 ## Features
@@ -109,6 +198,21 @@ pip install -e ".[dev]"
 - **HuggingFace Integration**: Extended model support with quantization
 - **Multi-layer Support**: Apply steering to any transformer layer
 - **Persistent Steering**: Vectors stay active across multiple generations
+
+### Agent Framework Integrations (Phase 3) ✨
+- **LangChain**: BaseLLM wrapper for chains and agents
+- **Microsoft Agent Framework**: Azure AI Foundry deployment with tracing
+- **LlamaIndex**: CustomLLM for RAG applications
+- **Multi-Agent Orchestration**: Sequential, parallel, hierarchical workflows
+- **Prompt Flow Support**: Visual flow design and A/B testing
+
+### Safety & Evaluation (Phase 3) ✨
+- **ToxiGen Benchmark**: 13 minority groups, implicit toxicity detection
+- **RealToxicityPrompts**: 100K naturally occurring prompts
+- **Toxicity Metrics**: Local models (unitary/toxic-bert) or Perspective API
+- **Steering Effectiveness**: Before/after comparison with multiple metrics
+- **Domain Accuracy**: Keyword-based domain evaluation (medical, legal, technical)
+- **Evaluation Suite**: Unified interface with JSON reports and visualization
 
 ### Advanced Discovery (Phase 2) ✅
 - **CAA (Contrastive Activation Addition)**: Layer-wise contrasts for stronger steering
@@ -159,22 +263,7 @@ model = SteeringModel.from_pretrained(
 )
 ```
 
-### Device Support
-
-- ✅ **CPU**: Full support
-- ✅ **CUDA**: Multi-GPU with `device_map="auto"`
-- ✅ **MPS**: Apple Silicon support
-
-## Requirements
-
-- Python 3.9+
-- PyTorch 2.0+
-- Transformers 4.36+
-- scikit-learn 1.3+ (for linear probing)
-
-## Testing
-
-The project maintains 95%+ test coverage with 132 comprehensive tests:
+### Device Support70+ comprehensive tests:
 
 ```bash
 # Run all tests
@@ -183,7 +272,49 @@ pytest
 # Run specific test suite
 pytest tests/test_discovery_advanced.py
 pytest tests/test_vector_composition.py
+pytest tests/agents/test_base.py
+pytest tests/evaluation/test_metrics.py
 
+# Run with coverage report
+pytest --cov=steering_llm --cov-report=html
+
+# Skip slow integration tests
+pytest -m "not slow"
+```
+
+### Test Coverage
+- **Core**: 132 tests (Phase 1 & 2)
+- **Agents**: 20+ tests (Phase 3)
+- **Evaluation**: 18+ tests (Phase 3)
+- **Total**: 170+ tests, 95%+ coverage
+## Testing
+
+The project maintains 95%+ test coverage with 132 comprehensive tests:
+
+```bash
+# RContributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+
+## Examples
+
+- **Basic Usage**: [examples/steering_basic_usage.py](examples/steering_basic_usage.py)
+- **LangChain Integration**: [examples/langchain_steering_agent.py](examples/langchain_steering_agent.py)
+- **Azure Agent Framework**: [examples/azure_agent_foundry.py](examples/azure_agent_foundry.py)
+- **LlamaIndex RAG**: [examples/llamaindex_rag_steering.py](examples/llamaindex_rag_steering.py)
+
+## Documentation
+
+- **Architecture**: [docs/adr/ADR-001-steeringllm-architecture.md](docs/adr/ADR-001-steeringllm-architecture.md)
+- **API Reference**: [docs/API-REFERENCE.md](docs/API-REFERENCE.md)
+- **Project Setup**: [docs/project-setup.md](docs/project-setup.md)
+
+## Roadmap
+
+- ✅ **Phase 1**: Core steering primitives and HuggingFace integration
+- ✅ **Phase 2**: Advanced discovery (CAA, probing) and vector composition
+- ✅ **Phase 3**: Agent integrations, safety benchmarks, evaluation
+- 🚧 **Phase 4**: Performance optimization, caching, distributed steering
 # Run with coverage report
 pytest --cov=steering_llm --cov-report=html
 ```
