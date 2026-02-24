@@ -64,6 +64,12 @@ agents = [
     "llama-index-core>=0.10.0,<0.12.0",
 ]
 
+# Interactive demo UI
+demo = [
+    "streamlit>=1.30.0,<2.0.0",
+    "pandas>=2.0.0,<3.0.0",
+]
+
 # All optional dependencies
 all = [
     "langchain-core>=0.1.0,<0.3.0",
@@ -72,6 +78,7 @@ all = [
     "llama-index-llms-huggingface>=0.1.0,<0.3.0",
     "azure-monitor-opentelemetry>=1.0.0,<2.0.0",
     "datasets>=2.14.0,<3.0.0",
+    "streamlit>=1.30.0,<2.0.0",
 ]
 
 dev = [

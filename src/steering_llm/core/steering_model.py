@@ -120,7 +120,8 @@ class ActivationHook:
                 Modified output with steering applied
             """
             # Handle both tuple and tensor outputs
-            if isinstance(output, tuple):
+            is_tuple = isinstance(output, tuple)
+            if is_tuple:
                 # Most transformer layers return (hidden_states, ...)
                 hidden_states = output[0]
                 other_outputs = output[1:]
@@ -137,8 +138,8 @@ class ActivationHook:
             # Broadcasting: [batch, seq_len, hidden_dim] + [hidden_dim]
             steered = hidden_states + (self.alpha * steering_tensor)
             
-            # Return in original format
-            if other_outputs:
+            # Return in the SAME format as the original output
+            if is_tuple:
                 return (steered,) + other_outputs
             else:
                 return steered
