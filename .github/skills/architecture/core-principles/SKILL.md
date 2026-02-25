@@ -1,14 +1,32 @@
 ---
-name: core-principles
-description: 'Fundamental coding principles for production development including SOLID, DRY, KISS, and common design patterns with C# examples.'
+name: "core-principles"
+description: 'Apply fundamental coding principles including SOLID, DRY, KISS, and common design patterns. Use when refactoring code for maintainability, reviewing design pattern usage, teaching SOLID principles, or evaluating code quality against engineering standards.'
+metadata:
+ author: "AgentX"
+ version: "1.0.0"
+ created: "2025-01-15"
+ updated: "2025-01-15"
+compatibility:
+ languages: ["csharp"]
 ---
 
 # Core Principles
 
-> **Purpose**: Fundamental principles guiding production code development.  
+> **Purpose**: Fundamental principles guiding production code development. 
 > **Focus**: SOLID, DRY, KISS, design patterns.
 
 ---
+
+## When to Use This Skill
+
+- Reviewing code for SOLID principle compliance
+- Refactoring code for maintainability
+- Choosing appropriate design patterns
+- Teaching or evaluating engineering standards
+
+## Prerequisites
+
+- Basic OOP programming knowledge
 
 ## SOLID Principles
 
@@ -16,26 +34,26 @@ description: 'Fundamental coding principles for production development including
 Each class has one reason to change.
 
 ```csharp
-// ❌ Multiple responsibilities
+// [FAIL] Multiple responsibilities
 public class User
 {
-    public string Name { get; set; }
-    public void SaveToDatabase() { } // Persistence
-    public void SendEmail() { } // Communication
+ public string Name { get; set; }
+ public void SaveToDatabase() { } // Persistence
+ public void SendEmail() { } // Communication
 }
 
-// ✅ Single responsibility
+// [PASS] Single responsibility
 public class User
 {
-    public string Name { get; set; }
+ public string Name { get; set; }
 }
 public class UserRepository
 {
-    public void Save(User user) { }
+ public void Save(User user) { }
 }
 public class EmailService
 {
-    public void SendEmail(User user) { }
+ public void SendEmail(User user) { }
 }
 ```
 
@@ -43,10 +61,10 @@ public class EmailService
 Open for extension, closed for modification.
 
 ```csharp
-// ✅ Extend via abstraction
+// [PASS] Extend via abstraction
 public interface IPaymentProcessor
 {
-    Task<PaymentResult> ProcessAsync(decimal amount);
+ Task<PaymentResult> ProcessAsync(decimal amount);
 }
 
 public class CreditCardProcessor : IPaymentProcessor { }
@@ -54,10 +72,10 @@ public class PayPalProcessor : IPaymentProcessor { }
 
 public class PaymentService
 {
-    public async Task ProcessPaymentAsync(IPaymentProcessor processor, decimal amount)
-    {
-        return await processor.ProcessAsync(amount);
-    }
+ public async Task ProcessPaymentAsync(IPaymentProcessor processor, decimal amount)
+ {
+ return await processor.ProcessAsync(amount);
+ }
 }
 ```
 
@@ -65,20 +83,20 @@ public class PaymentService
 Subtypes must be substitutable for base types.
 
 ```csharp
-// ✅ Derived classes extend, don't break behavior
+// [PASS] Derived classes extend, don't break behavior
 public abstract class Bird
 {
-    public abstract void Move();
+ public abstract void Move();
 }
 
 public class Sparrow : Bird
 {
-    public override void Move() => Fly();
+ public override void Move() => Fly();
 }
 
 public class Penguin : Bird
 {
-    public override void Move() => Walk(); // Different but valid
+ public override void Move() => Walk(); // Different but valid
 }
 ```
 
@@ -86,15 +104,15 @@ public class Penguin : Bird
 Many specific interfaces > one general interface.
 
 ```csharp
-// ❌ Fat interface
+// [FAIL] Fat interface
 public interface IWorker
 {
-    void Work();
-    void Eat();
-    void Sleep();
+ void Work();
+ void Eat();
+ void Sleep();
 }
 
-// ✅ Segregated interfaces
+// [PASS] Segregated interfaces
 public interface IWorkable { void Work(); }
 public interface IFeedable { void Eat(); }
 public interface IRestable { void Sleep(); }
@@ -104,15 +122,15 @@ public interface IRestable { void Sleep(); }
 Depend on abstractions, not concretions.
 
 ```csharp
-// ✅ Depend on interface
+// [PASS] Depend on interface
 public class OrderService
 {
-    private readonly IOrderRepository _repository;
-    
-    public OrderService(IOrderRepository repository)
-    {
-        _repository = repository;
-    }
+ private readonly IOrderRepository _repository;
+ 
+ public OrderService(IOrderRepository repository)
+ {
+ _repository = repository;
+ }
 }
 ```
 
@@ -121,33 +139,33 @@ public class OrderService
 ## DRY (Don't Repeat Yourself)
 
 ```csharp
-// ❌ Duplication
+// [FAIL] Duplication
 public class UserService
 {
-    public User GetUser(int id)
-    {
-        var conn = new SqlConnection(connectionString);
-        conn.Open();
-        // ... query logic
-    }
-    
-    public Order GetOrder(int id)
-    {
-        var conn = new SqlConnection(connectionString);
-        conn.Open();
-        // ... query logic
-    }
+ public User GetUser(int id)
+ {
+ var conn = new SqlConnection(connectionString);
+ conn.Open();
+ // ... query logic
+ }
+ 
+ public Order GetOrder(int id)
+ {
+ var conn = new SqlConnection(connectionString);
+ conn.Open();
+ // ... query logic
+ }
 }
 
-// ✅ Extract common logic
+// [PASS] Extract common logic
 public abstract class BaseRepository
 {
-    protected SqlConnection GetConnection()
-    {
-        var conn = new SqlConnection(connectionString);
-        conn.Open();
-        return conn;
-    }
+ protected SqlConnection GetConnection()
+ {
+ var conn = new SqlConnection(connectionString);
+ conn.Open();
+ return conn;
+ }
 }
 ```
 
@@ -156,28 +174,28 @@ public abstract class BaseRepository
 ## KISS (Keep It Simple, Stupid)
 
 ```csharp
-// ❌ Overengineered
+// [FAIL] Overengineered
 public class UserValidator
 {
-    public bool Validate(User user)
-    {
-        var strategy = ValidatorStrategyFactory
-            .CreateStrategy(user.UserType)
-            .GetValidationChain()
-            .Execute(new ValidationContext(user));
-        return strategy.IsValid;
-    }
+ public bool Validate(User user)
+ {
+ var strategy = ValidatorStrategyFactory
+ .CreateStrategy(user.UserType)
+ .GetValidationChain()
+ .Execute(new ValidationContext(user));
+ return strategy.IsValid;
+ }
 }
 
-// ✅ Simple
+// [PASS] Simple
 public class UserValidator
 {
-    public bool Validate(User user)
-    {
-        return !string.IsNullOrEmpty(user.Email) &&
-               user.Email.Contains("@") &&
-               user.Age >= 13;
-    }
+ public bool Validate(User user)
+ {
+ return !string.IsNullOrEmpty(user.Email) &&
+ user.Email.Contains("@") &&
+ user.Age >= 13;
+ }
 }
 ```
 
@@ -189,71 +207,9 @@ Don't build features "just in case". Build what's needed now.
 
 ---
 
-## Design Patterns (Common)
-
-### Repository Pattern
-
-```csharp
-public interface IRepository<T>
-{
-    Task<T?> GetByIdAsync(int id);
-    Task<IEnumerable<T>> GetAllAsync();
-    Task AddAsync(T entity);
-}
-
-public class UserRepository : IRepository<User>
-{
-    private readonly AppDbContext _context;
-    public UserRepository(AppDbContext context) => _context = context;
-    
-    public async Task<User?> GetByIdAsync(int id) => 
-        await _context.Users.FindAsync(id);
-}
-```
-
-### Factory Pattern
-
-```csharp
-public interface IPaymentProcessorFactory
-{
-    IPaymentProcessor Create(string type);
-}
-
-public class PaymentProcessorFactory : IPaymentProcessorFactory
-{
-    public IPaymentProcessor Create(string type) => type switch
-    {
-        "credit_card" => new CreditCardProcessor(),
-        "paypal" => new PayPalProcessor(),
-        _ => throw new ArgumentException("Invalid payment type")
-    };
-}
-```
-
-### Strategy Pattern
-
-```csharp
-public interface IPricingStrategy
-{
-    decimal CalculatePrice(decimal basePrice);
-}
-
-public class RegularPricing : IPricingStrategy
-{
-    public decimal CalculatePrice(decimal basePrice) => basePrice;
-}
-
-public class DiscountPricing : IPricingStrategy
-{
-    public decimal CalculatePrice(decimal basePrice) => basePrice * 0.9m;
-}
-```
-
----
-
 ## Best Practices
 
-### ✅ DO
+### [PASS] DO
 
 - **Follow SOLID** - Especially SRP and DIP
 - **Keep functions small** - One thing, well
@@ -263,7 +219,7 @@ public class DiscountPricing : IPricingStrategy
 - **Refactor regularly** - Improve as you go
 - **Document complex logic** - Why, not what
 
-### ❌ DON'T
+### [FAIL] DON'T
 
 - **Violate SOLID** - Leads to rigid, fragile code
 - **Duplicate code** - Extract to methods/classes
@@ -274,7 +230,17 @@ public class DiscountPricing : IPricingStrategy
 
 ---
 
-**See Also**: [08-code-organization.md](08-code-organization.md) • [02-testing.md](02-testing.md)
+**See Also**: [Code Organization](../code-organization/SKILL.md) - [Testing](../../development/testing/SKILL.md)
 
 **Last Updated**: January 13, 2026
 
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Over-engineering with patterns | Apply YAGNI - only use patterns when complexity warrants them |
+| DRY violation detected | Extract shared logic into a utility method or base class |
+
+## References
+
+- [Design Patterns](references/design-patterns.md)

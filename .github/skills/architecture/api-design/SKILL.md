@@ -1,37 +1,77 @@
 ---
-name: api-design
-description: 'Language-agnostic REST API design with proper versioning, pagination, error handling, rate limiting, and documentation best practices.'
+name: "api-design"
+description: 'Design robust REST APIs with proper versioning, pagination, error handling, rate limiting, and documentation. Use when creating new API endpoints, designing resource naming conventions, implementing pagination or filtering, adding rate limiting, or documenting APIs with OpenAPI/Swagger.'
+metadata:
+ author: "AgentX"
+ version: "1.0.0"
+ created: "2025-01-15"
+ updated: "2025-01-15"
 ---
 
 # API Design
 
-> **Purpose**: Design robust, maintainable, and user-friendly REST APIs.  
-> **Focus**: Resource naming, HTTP methods, status codes, versioning, documentation.  
+> **Purpose**: Design robust, maintainable, and user-friendly REST APIs. 
+> **Focus**: Resource naming, HTTP methods, status codes, versioning, documentation. 
 > **Note**: Language-agnostic patterns applicable to any tech stack.
 
 ---
+
+## When to Use This Skill
+
+- Designing new REST API endpoints
+- Implementing pagination, filtering, or sorting
+- Adding rate limiting or CORS configuration
+- Documenting APIs with OpenAPI/Swagger
+- Designing webhook notification systems
+
+## Prerequisites
+
+- HTTP protocol fundamentals
+- JSON data format understanding
+
+## Decision Tree
+
+```
+Designing an API endpoint?
++- What operation?
+| +- Read data -> GET (idempotent, cacheable)
+| +- Create resource -> POST (returns 201 + Location header)
+| +- Full update -> PUT (idempotent, replaces entire resource)
+| +- Partial update -> PATCH (only changed fields)
+| - Remove -> DELETE (idempotent, returns 204)
++- Returns collection?
+| - Add pagination (cursor or offset) + filtering + sorting
++- Versioning needed?
+| +- URL path versioning -> /api/v1/resources (recommended)
+| - Header versioning -> Accept: application/vnd.api.v1+json
++- Error handling?
+| - RFC 7807 Problem Details with proper HTTP status codes
+- Security?
+ +- Public? -> Rate limiting + API key
+ - Private? -> OAuth2/JWT + scopes
+```
 
 ## RESTful Conventions
 
 ### Resource Naming
 
 ```
-✅ Good:
-GET    /api/v1/users              # List users
-POST   /api/v1/users              # Create user
-GET    /api/v1/users/{id}         # Get specific user
-PUT    /api/v1/users/{id}         # Update user (full)
-PATCH  /api/v1/users/{id}         # Update user (partial)
-DELETE /api/v1/users/{id}         # Delete user
+[PASS] Good:
+GET /api/v1/users # List users
+POST /api/v1/users # Create user
+GET /api/v1/users/{id} # Get specific user
+PUT /api/v1/users/{id} # Update user (full)
+PATCH /api/v1/users/{id} # Update user (partial)
+DELETE /api/v1/users/{id} # Delete user
 
-GET    /api/v1/users/{id}/orders  # Get user's orders (nested)
-POST   /api/v1/users/{id}/orders  # Create order for user
+GET /api/v1/users/{id}/orders # Get user's orders (nested)
+POST /api/v1/users/{id}/orders # Create order for user
 
-❌ Bad:
-GET    /api/v1/get_users
-POST   /api/v1/create_user
-GET    /api/v1/user_detail?id=123
-POST   /api/v1/users/delete/{id}  # Use DELETE method instead
+[FAIL] Bad:
+GET /api/v1/get_users
+POST /api/v1/create_user
+GET /api/v1/user_detail?id=123
+POST /api/v1/users/delete/{id} # Use DELETE method instead
 ```
 
 ### Resource Naming Rules
@@ -59,7 +99,7 @@ POST   /api/v1/users/delete/{id}  # Use DELETE method instead
 | **HEAD** | Get metadata only | Yes | Yes |
 | **OPTIONS** | Get allowed methods | Yes | Yes |
 
-**Idempotent**: Multiple identical requests have same effect as single request  
+**Idempotent**: Multiple identical requests have same effect as single request 
 **Safe**: Read-only, doesn't modify server state
 
 ### Method Usage Examples
@@ -69,9 +109,9 @@ POST   /api/v1/users/delete/{id}  # Use DELETE method instead
 GET /api/v1/users/123
 Response: 200 OK
 {
-  "id": 123,
-  "email": "user@example.com",
-  "name": "John Doe"
+ "id": 123,
+ "email": "user@example.com",
+ "name": "John Doe"
 }
 
 # POST - Create
@@ -87,7 +127,7 @@ Response: 200 OK
 
 # PATCH - Partial update
 PATCH /api/v1/users/123
-Body: {"name": "New Name"}  # Only updates name
+Body: {"name": "New Name"} # Only updates name
 Response: 200 OK
 
 # DELETE - Remove
@@ -102,439 +142,32 @@ Response: 204 No Content
 ### Success Codes (2xx)
 
 ```
-200 OK                  # Successful GET, PUT, PATCH
-201 Created             # Successful POST (resource created)
-202 Accepted            # Request accepted, processing async
-204 No Content          # Successful DELETE (no response body)
+200 OK # Successful GET, PUT, PATCH
+201 Created # Successful POST (resource created)
+202 Accepted # Request accepted, processing async
+204 No Content # Successful DELETE (no response body)
 ```
 
 ### Client Error Codes (4xx)
 
 ```
-400 Bad Request         # Invalid request syntax, validation error
-401 Unauthorized        # Authentication required or failed
-403 Forbidden           # Authenticated but insufficient permissions
-404 Not Found           # Resource doesn't exist
-405 Method Not Allowed  # HTTP method not supported
-409 Conflict            # Resource conflict (e.g., duplicate email)
-422 Unprocessable       # Validation error (semantic issue)
-429 Too Many Requests   # Rate limit exceeded
+400 Bad Request # Invalid request syntax, validation error
+401 Unauthorized # Authentication required or failed
+403 Forbidden # Authenticated but insufficient permissions
+404 Not Found # Resource doesn't exist
+405 Method Not Allowed # HTTP method not supported
+409 Conflict # Resource conflict (e.g., duplicate email)
+422 Unprocessable # Validation error (semantic issue)
+429 Too Many Requests # Rate limit exceeded
 ```
 
 ### Server Error Codes (5xx)
 
 ```
-500 Internal Server Error  # Unhandled server error
-502 Bad Gateway           # Invalid response from upstream server
-503 Service Unavailable   # Server temporarily unavailable
-504 Gateway Timeout       # Upstream server timeout
-```
-
----
-
-## Response Format
-
-### Success Response
-
-```json
-{
-  "status": "success",
-  "data": {
-    "id": 123,
-    "email": "user@example.com",
-    "name": "John Doe"
-  },
-  "metadata": {
-    "timestamp": "2026-01-27T12:00:00Z",
-    "version": "1.0.0"
-  }
-}
-```
-
-### Error Response
-
-```json
-{
-  "status": "error",
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input data",
-    "details": [
-      {
-        "field": "email",
-        "message": "Email is required"
-      },
-      {
-        "field": "age",
-        "message": "Must be between 18 and 120"
-      }
-    ]
-  },
-  "metadata": {
-    "requestId": "abc-123-xyz",
-    "timestamp": "2026-01-27T12:00:00Z"
-  }
-}
-```
-
-### Collection Response
-
-```json
-{
-  "status": "success",
-  "data": [
-    {"id": 1, "name": "User 1"},
-    {"id": 2, "name": "User 2"}
-  ],
-  "pagination": {
-    "page": 1,
-    "pageSize": 20,
-    "totalPages": 5,
-    "totalItems": 100,
-    "hasNext": true,
-    "hasPrevious": false
-  }
-}
-```
-
----
-
-## API Versioning
-
-### URL Versioning (Recommended)
-
-```
-GET /api/v1/users
-GET /api/v2/users  # New version
-```
-
-**Pros:**
-- Clear and explicit
-- Easy to route
-- Browser-friendly
-- Cacheable
-
-### Header Versioning
-
-```
-GET /api/users
-Accept: application/vnd.myapi.v1+json
-```
-
-**Pros:**
-- Clean URLs
-- More RESTful
-- Supports multiple versions
-
-### Versioning Strategy
-
-```
-Version Lifecycle:
-  v1 (Stable)     → Fully supported
-  v2 (Current)    → Recommended, default
-  v3 (Preview)    → Beta, may change
-  
-Deprecation:
-  1. Announce deprecation (6-12 months notice)
-  2. Add deprecation warning header
-  3. Document migration guide
-  4. Sunset old version
-```
-
----
-
-## Pagination
-
-### Offset-Based Pagination
-
-```
-GET /api/v1/users?page=2&pageSize=20
-
-Response:
-{
-  "data": [...],
-  "pagination": {
-    "page": 2,
-    "pageSize": 20,
-    "totalPages": 5,
-    "totalItems": 100
-  }
-}
-```
-
-**Pros**: Simple, intuitive  
-**Cons**: Slow for large offsets, inconsistent results if data changes
-
-### Cursor-Based Pagination
-
-```
-GET /api/v1/users?limit=20&cursor=abc123
-
-Response:
-{
-  "data": [...],
-  "pagination": {
-    "nextCursor": "xyz789",
-    "hasMore": true
-  }
-}
-```
-
-**Pros**: Fast for large datasets, consistent results  
-**Cons**: Can't jump to specific page
-
----
-
-## Filtering, Sorting, Searching
-
-### Filtering
-
-```
-GET /api/v1/users?status=active&role=admin
-GET /api/v1/products?minPrice=10&maxPrice=100
-GET /api/v1/orders?createdAfter=2024-01-01
-```
-
-### Sorting
-
-```
-GET /api/v1/users?sort=createdAt:desc
-GET /api/v1/products?sort=price:asc,name:asc  # Multi-column
-```
-
-### Searching
-
-```
-GET /api/v1/users?q=john
-GET /api/v1/products?search=laptop&category=electronics
-```
-
-### Field Selection (Sparse Fieldsets)
-
-```
-GET /api/v1/users?fields=id,email,name
-# Only returns specified fields
-```
-
----
-
-## Rate Limiting
-
-### Rate Limit Headers
-
-```
-HTTP Response Headers:
-  X-RateLimit-Limit: 1000       # Total requests allowed
-  X-RateLimit-Remaining: 500    # Requests remaining
-  X-RateLimit-Reset: 1642531200 # Unix timestamp when limit resets
-  Retry-After: 3600             # Seconds until retry allowed (on 429)
-```
-
-### Rate Limit Strategy
-
-```
-Rate Limiting Tiers:
-  Anonymous:    100 requests/hour
-  Authenticated: 1000 requests/hour
-  Premium:      10000 requests/hour
-```
-
----
-
-## CORS Configuration
-
-### CORS Headers
-
-```
-Access-Control-Allow-Origin: https://example.com
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: Content-Type, Authorization
-Access-Control-Max-Age: 86400  # Cache preflight for 24 hours
-```
-
-### Preflight Request Handling
-
-```
-OPTIONS /api/v1/users
-Response: 204 No Content
-Access-Control-Allow-Origin: https://example.com
-Access-Control-Allow-Methods: GET, POST, PUT, DELETE
-```
-
----
-
-## Authentication & Authorization
-
-### Bearer Token Authentication
-
-```
-Request:
-POST /api/v1/users
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-```
-
-### API Key Authentication
-
-```
-Request:
-GET /api/v1/users
-X-API-Key: abc123xyz789
-```
-
-### Authorization Patterns
-
-```
-# Check permissions in request
-if not user.hasPermission("users:write"):
-    return 403 Forbidden
-    
-# Resource ownership check
-if resource.ownerId != currentUser.id and not currentUser.isAdmin():
-    return 403 Forbidden
-```
-
----
-
-## Idempotency
-
-### Idempotency Keys
-
-```
-POST /api/v1/payments
-Idempotency-Key: unique-key-123
-Body: {"amount": 100, "currency": "USD"}
-
-# If same key sent again, returns original response
-# Prevents duplicate charges
-```
-
-### Safe Retry Pattern
-
-```
-Client retries on network failure:
-  1. Include Idempotency-Key in request
-  2. Server stores key + response
-  3. If key seen again, return stored response
-  4. Prevents duplicate operations
-```
-
----
-
-## API Documentation
-
-### OpenAPI/Swagger Specification
-
-```yaml
-openapi: 3.0.0
-info:
-  title: User API
-  version: 1.0.0
-paths:
-  /users:
-    get:
-      summary: List all users
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Successful response
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
-components:
-  schemas:
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-        email:
-          type: string
-        name:
-          type: string
-```
-
-### Documentation Best Practices
-
-- ✅ Document all endpoints
-- ✅ Include request/response examples
-- ✅ Document error responses
-- ✅ Provide authentication details
-- ✅ Include rate limiting info
-- ✅ Link to SDK/client libraries
-- ✅ Keep docs up-to-date
-
----
-
-## Content Negotiation
-
-### Request Format
-
-```
-POST /api/v1/users
-Content-Type: application/json
-Body: {"email": "user@example.com"}
-```
-
-### Response Format
-
-```
-GET /api/v1/users
-Accept: application/json
-
-Response:
-Content-Type: application/json
-Body: [{"id": 1, "email": "..."}]
-```
-
-### Multiple Formats
-
-```
-Accept: application/json       → JSON response
-Accept: application/xml        → XML response
-Accept: text/csv              → CSV response
-```
-
----
-
-## Webhooks
-
-### Webhook Pattern
-
-```
-1. Client registers webhook URL
-   POST /api/v1/webhooks
-   Body: {"url": "https://client.com/webhook", "events": ["user.created"]}
-
-2. Event occurs (user created)
-
-3. Server sends HTTP POST to webhook URL
-   POST https://client.com/webhook
-   Body: {
-     "event": "user.created",
-     "data": {"id": 123, "email": "..."},
-     "timestamp": "2026-01-27T12:00:00Z"
-   }
-
-4. Client responds with 200 OK
-```
-
-### Webhook Security
-
-```
-# Include signature in header
-X-Webhook-Signature: sha256=abc123...
-
-# Client verifies signature
-signature = HMAC-SHA256(secret, requestBody)
-if signature != headerSignature:
-    return 401 Unauthorized
+500 Internal Server Error # Unhandled server error
+502 Bad Gateway # Invalid response from upstream server
+503 Service Unavailable # Server temporarily unavailable
+504 Gateway Timeout # Upstream server timeout
 ```
 
 ---
@@ -543,32 +176,32 @@ if signature != headerSignature:
 
 ### Security
 
-- ✅ Use HTTPS everywhere
-- ✅ Implement authentication
-- ✅ Validate all inputs
-- ✅ Rate limit requests
-- ✅ Use API keys for server-to-server
-- ✅ Implement CORS properly
-- ✅ Log security events
+- [PASS] Use HTTPS everywhere
+- [PASS] Implement authentication
+- [PASS] Validate all inputs
+- [PASS] Rate limit requests
+- [PASS] Use API keys for server-to-server
+- [PASS] Implement CORS properly
+- [PASS] Log security events
 
 ### Performance
 
-- ✅ Implement caching (ETags, Cache-Control)
-- ✅ Use compression (gzip, brotli)
-- ✅ Paginate large collections
-- ✅ Support field filtering
-- ✅ Use CDN for static content
-- ✅ Monitor API performance
+- [PASS] Implement caching (ETags, Cache-Control)
+- [PASS] Use compression (gzip, brotli)
+- [PASS] Paginate large collections
+- [PASS] Support field filtering
+- [PASS] Use CDN for static content
+- [PASS] Monitor API performance
 
 ### Developer Experience
 
-- ✅ Provide clear error messages
-- ✅ Use consistent naming
-- ✅ Version your API
-- ✅ Maintain comprehensive docs
-- ✅ Provide SDK/client libraries
-- ✅ Include examples
-- ✅ Offer sandbox environment
+- [PASS] Provide clear error messages
+- [PASS] Use consistent naming
+- [PASS] Version your API
+- [PASS] Maintain comprehensive docs
+- [PASS] Provide SDK/client libraries
+- [PASS] Include examples
+- [PASS] Offer sandbox environment
 
 ---
 
@@ -601,6 +234,26 @@ if signature != headerSignature:
 
 ---
 
-**See Also**: [Skills.md](../../../../Skills.md) • [AGENTS.md](../../../../AGENTS.md)
+**See Also**: [Skills.md](../../../../Skills.md) - [AGENTS.md](../../../../AGENTS.md)
 
 **Last Updated**: January 27, 2026
+
+## Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| [`scaffold-openapi.py`](scripts/scaffold-openapi.py) | Generate OpenAPI 3.1 spec from endpoint definitions | `python scripts/scaffold-openapi.py --name "My API" --endpoints "GET /users, POST /users"` |
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| CORS errors in browser | Configure Access-Control-Allow-Origin header with specific origins, not wildcards |
+| Pagination inconsistency | Use cursor-based pagination for mutable datasets, offset for static |
+| Rate limit bypass attempts | Implement per-user rate limiting with token bucket algorithm |
+
+## References
+
+- [Api Response Patterns](references/api-response-patterns.md)
+- [Api Security Patterns](references/api-security-patterns.md)
+- [Api Docs Webhooks](references/api-docs-webhooks.md)

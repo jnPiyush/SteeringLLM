@@ -1,14 +1,28 @@
 ---
 name: ai-agent-development
-description: 'Build production-ready AI agents with Microsoft Foundry and Agent Framework. Covers agent architecture, model selection, orchestration, tracing, and evaluation.'
+description: 'Build production-ready AI agents with Microsoft Foundry and Agent Framework. Use when creating AI agents, selecting LLM models, implementing agent orchestration, adding tracing/observability, or evaluating agent quality. Covers agent architecture, model selection, multi-agent workflows, and production deployment.'
 ---
 
 # AI Agent Development
 
-> **Purpose**: Build production-ready AI agents with Microsoft Foundry and Agent Framework.  
+> **Purpose**: Build production-ready AI agents with Microsoft Foundry and Agent Framework. 
 > **Scope**: Agent architecture, model selection, orchestration, observability, evaluation.
 
 ---
+
+## When to Use This Skill
+
+- Building AI agents with Microsoft Foundry or Agent Framework
+- Selecting LLM models for agent scenarios
+- Implementing multi-agent orchestration workflows
+- Adding tracing and observability to AI agents
+- Evaluating agent quality and response accuracy
+
+## Prerequisites
+
+- Python 3.11+ or .NET 8+
+- agent-framework-azure-ai package
+- Microsoft Foundry workspace with deployed model
 
 ## Quick Start
 
@@ -16,7 +30,7 @@ description: 'Build production-ready AI agents with Microsoft Foundry and Agent 
 
 **Python** (Recommended):
 ```bash
-pip install agent-framework-azure-ai --pre  # --pre required during preview
+pip install agent-framework-azure-ai --pre # --pre required during preview
 ```
 
 **.NET**:
@@ -37,7 +51,7 @@ dotnet add package Microsoft.Agents.AI.Workflows --prerelease
 | **gpt-5.1** | Multi-step reasoning | 200K/100K | $3.44 |
 | **o3** | Advanced reasoning | 200K/100K | $3.5 |
 
-**Deploy Model**: `Ctrl+Shift+P` → `AI Toolkit: Deploy Model`
+**Deploy Model**: `Ctrl+Shift+P` -> `AI Toolkit: Deploy Model`
 
 ---
 
@@ -46,37 +60,49 @@ dotnet add package Microsoft.Agents.AI.Workflows --prerelease
 ### Single Agent
 
 ```python
+from pathlib import Path
 from agent_framework.openai import OpenAIChatClient
 
+# Load prompt from file - NEVER embed prompts as inline strings
+prompt = Path("prompts/assistant.md").read_text(encoding="utf-8")
+
 client = OpenAIChatClient(
-    model="gpt-5.1",
-    api_key=os.getenv("FOUNDRY_API_KEY"),
-    endpoint=os.getenv("FOUNDRY_ENDPOINT")
+ model="gpt-5.1",
+ api_key=os.getenv("FOUNDRY_API_KEY"),
+ endpoint=os.getenv("FOUNDRY_ENDPOINT")
 )
 
 agent = {
-    "name": "Assistant",
-    "instructions": "You are a helpful assistant.",
-    "tools": []  # Add tools as needed
+ "name": "Assistant",
+ "instructions": prompt, # Loaded from prompts/assistant.md
+ "tools": [] # Add tools as needed
 }
 
 response = await client.chat(
-    messages=[{"role": "user", "content": "Hello"}],
-    agent=agent
+ messages=[{"role": "user", "content": "Hello"}],
+ agent=agent
 )
 ```
 
 ### Multi-Agent Orchestration
 
 ```python
+from pathlib import Path
 from agent_framework.workflows import SequentialWorkflow
 
-researcher = {"name": "Researcher", "instructions": "Gather information."}
-writer = {"name": "Writer", "instructions": "Write based on research."}
+# Each agent loads its prompt from a dedicated file
+researcher = {
+ "name": "Researcher",
+ "instructions": Path("prompts/researcher.md").read_text(encoding="utf-8")
+}
+writer = {
+ "name": "Writer",
+ "instructions": Path("prompts/writer.md").read_text(encoding="utf-8")
+}
 
 workflow = SequentialWorkflow(
-    agents=[researcher, writer],
-    handoff_strategy="on_completion"
+ agents=[researcher, writer],
+ handoff_strategy="on_completion"
 )
 
 result = await workflow.run(query="Write about AI agents")
@@ -89,194 +115,72 @@ result = await workflow.run(query="Write about AI agents")
 
 ---
 
-## Observability (Tracing)
-
-### Setup OpenTelemetry
-
-```python
-from agent_framework.observability import configure_otel_providers
-
-# Before running agent - must open trace viewer first!
-configure_otel_providers(
-    vs_code_extension_port=4317,  # AI Toolkit gRPC port
-    enable_sensitive_data=True
-)
-```
-
-**Open Trace Viewer**: `Ctrl+Shift+P` → `AI Toolkit: Open Trace Viewer`
-
-⚠️ **CRITICAL**: Open trace viewer BEFORE running your agent.
-
----
-
-## Evaluation
-
-### Workflow
-
-1. Upload dataset (JSONL)
-2. Define evaluators (built-in or custom)
-3. Create evaluation
-4. Run evaluation
-5. Analyze results
-
-### Prerequisites
-
-```bash
-pip install "azure-ai-projects>=2.0.0b2"
-```
-
-### Built-in Evaluators
-
-**Agent Evaluators**:
-- `builtin.intent_resolution` - Intent correctly identified?
-- `builtin.task_adherence` - Instructions followed?
-- `builtin.task_completion` - Task completed end-to-end?
-- `builtin.tool_call_accuracy` - Tools used correctly?
-- `builtin.tool_selection` - Right tools chosen?
-
-**Quality Evaluators**:
-- `builtin.coherence` - Natural text flow?
-- `builtin.fluency` - Grammar correct?
-- `builtin.groundedness` - Claims substantiated? (RAG)
-- `builtin.relevance` - Answers key points? (RAG)
-
-### Evaluation Example
-
-```python
-from azure.identity import DefaultAzureCredential
-from azure.ai.projects import AIProjectClient
-from openai.types.eval_create_params import DataSourceConfigCustom
-from openai.types.evals.create_eval_jsonl_run_data_source_param import (
-    CreateEvalJSONLRunDataSourceParam, SourceFileID
-)
-
-endpoint = os.getenv("FOUNDRY_PROJECT_ENDPOINT")
-model_deployment = os.getenv("MODEL_DEPLOYMENT_NAME")
-
-with (
-    DefaultAzureCredential() as credential,
-    AIProjectClient(endpoint=endpoint, credential=credential) as project_client,
-    project_client.get_openai_client() as openai_client,
-):
-    # 1. Upload Dataset
-    dataset = project_client.datasets.upload_file(
-        name="eval-data",
-        version="1",
-        file_path="data.jsonl"
-    )
-
-    # 2. Define Data Schema
-    data_source_config = DataSourceConfigCustom({
-        "type": "custom",
-        "item_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "response": {"type": "string"}
-            },
-            "required": ["query", "response"]
-        },
-        "include_sample_schema": True
-    })
-
-    # 3. Define Evaluators
-    testing_criteria = [
-        {
-            "type": "azure_ai_evaluator",
-            "name": "coherence",
-            "evaluator_name": "builtin.coherence",
-            "data_mapping": {
-                "query": "{{item.query}}", 
-                "response": "{{item.response}}"
-            },
-            "initialization_parameters": {"deployment_name": model_deployment}
-        }
-    ]
-
-    # 4. Create Evaluation
-    evaluation = openai_client.evals.create(
-        name="agent-eval",
-        data_source_config=data_source_config,
-        testing_criteria=testing_criteria
-    )
-
-    # 5. Run Evaluation
-    run = openai_client.evals.runs.create(
-        eval_id=evaluation.id,
-        name="eval-run",
-        data_source=CreateEvalJSONLRunDataSourceParam(
-            type="jsonl", 
-            source=SourceFileID(type="file_id", id=dataset.id)
-        )
-    )
-
-    # 6. Wait for Completion
-    while run.status not in ["completed", "failed"]:
-        run = openai_client.evals.runs.retrieve(run_id=run.id, eval_id=evaluation.id)
-        time.sleep(3)
-
-    print(f"Report: {run.report_url}")
-```
-
-### Custom Evaluators
-
-**Code-based** (objective metrics):
-```python
-code_evaluator = project_client.evaluators.create_version(
-    name="response_length_check",
-    evaluator_version={
-        "name": "response_length_check",
-        "definition": {
-            "type": "CODE",
-            "code_text": """
-def grade(sample, item):
-    length = len(item.get("response", ""))
-    return 1.0 if 100 <= length <= 500 else 0.5
-""",
-            # ... schema omitted for brevity
-        }
-    }
-)
-```
-
-**Prompt-based** (subjective metrics):
-```python
-prompt_evaluator = project_client.evaluators.create_version(
-    name="friendliness_check",
-    evaluator_version={
-        "name": "friendliness_check",
-        "definition": {
-            "type": "PROMPT",
-            "prompt_text": """
-Rate friendliness (1-5):
-Query: {{query}}
-Response: {{response}}
-
-Output JSON: {"result": <int>, "reason": "<text>"}
-""",
-            # ... schema omitted for brevity
-        }
-    }
-)
-```
-
----
-
 ## Best Practices
+
+### Prompt & Template File Management
+
+> **RULE**: NEVER embed prompts or output templates as inline strings in code. Always store them as separate files.
+
+**Why**: Prompts are content, not code. Separating them enables:
+- Version control diffs that show exactly what changed in a prompt
+- Non-developer editing (PMs, prompt engineers) without touching code
+- A/B testing different prompts without code changes
+- Reuse across agents, languages, and test harnesses
+- Clear separation of concerns (logic vs. content)
+
+**Directory Convention**:
+```
+project/
+ prompts/ # All system/agent prompts
+ assistant.md # One file per agent role
+ researcher.md
+ writer.md
+ reviewer.md
+ templates/ # Output templates used by agents
+ report-template.md # Structured output templates
+ email-template.md
+ summary-template.md
+ config/
+ models.yaml # Model configuration
+```
+
+**Loading Pattern**:
+```python
+from pathlib import Path
+
+# Load prompt
+prompt = Path("prompts/assistant.md").read_text(encoding="utf-8")
+
+# Load output template and inject into prompt
+template = Path("templates/report-template.md").read_text(encoding="utf-8")
+prompt_with_template = f"{prompt}\n\n## Output Format\n{template}"
+```
+
+**Rules**:
+- MUST store all system prompts in `prompts/` directory as `.md` or `.txt` files
+- MUST store output format templates in `templates/` directory
+- MUST NOT embed prompt text longer than one sentence directly in code
+- SHOULD use Markdown format for prompts (readable, supports structure)
+- SHOULD name files after the agent role: `prompts/{agent-name}.md`
+- SHOULD include a brief comment header in each prompt file (purpose, version, model target)
+- MAY use template variables (`{variable}`) for dynamic content injected at runtime
 
 ### Development
 
-✅ **DO**:
-- Plan agent architecture before coding (Research → Design → Implement)
+[PASS] **DO**:
+- Plan agent architecture before coding (Research -> Design -> Implement)
 - Use Microsoft Foundry models for production
 - Implement tracing from day one
 - Test with evaluation datasets before deployment
 - Use structured outputs for reliable agent responses
 - Implement error handling and retry logic
 - Version your agents and track changes
+- **Store all prompts as separate files in `prompts/` directory**
+- **Store output templates as separate files in `templates/` directory**
 
-❌ **DON'T**:
+[FAIL] **DON'T**:
 - Hardcode API keys or endpoints
+- Embed prompts or output templates as multi-line strings in code
 - Skip tracing setup (critical for debugging)
 - Deploy without evaluation
 - Use GitHub models in production (free tier has limits)
@@ -320,6 +224,29 @@ Output JSON: {"result": <int>, "reason": "<text>"}
 - [ ] Error handling with retries
 - [ ] Structured outputs configured
 - [ ] No hardcoded secrets
+- [ ] All prompts stored as separate files in `prompts/` (not inline in code)
+- [ ] All output templates stored in `templates/` (not inline in code)
+
+**Model Change Management (MANDATORY)**
+- [ ] Model version pinned explicitly (e.g., `gpt-5.1-2026-01-15`)
+- [ ] Model version configurable via environment variable
+- [ ] Evaluation baseline saved for current model
+- [ ] A/B evaluation run before any model switch
+- [ ] Structured output schema verified after model change
+- [ ] Tool/function-calling accuracy verified after model change
+- [ ] Model change documented in changelog with eval results
+- [ ] Weekly evaluation monitoring configured for drift detection
+- [ ] Alert threshold set for score drops > 10% from baseline
+
+**Model Change Test Automation (MANDATORY)**
+- [ ] Agent designed as model-agnostic (model injected via config)
+- [ ] `config/models.yaml` defines model test matrix with thresholds
+- [ ] Tested against 2 models (primary + fallback from different provider)
+- [ ] Multi-model comparison pipeline in CI/CD (weekly + on model config change)
+- [ ] Deployment gated on threshold checks (CI fails on regression)
+- [ ] Validated fallback model designated and documented
+- [ ] Comparison report generated per run (JSON + human-readable)
+- [ ] Cost and latency evaluators included alongside quality metrics
 
 **Observability**
 - [ ] OpenTelemetry tracing enabled
@@ -332,6 +259,9 @@ Output JSON: {"result": <int>, "reason": "<text>"}
 - [ ] Evaluators defined (built-in + custom)
 - [ ] Evaluation runs passing
 - [ ] Results meet quality thresholds
+- [ ] Multi-model comparison run (2+ models tested)
+- [ ] Fallback model validated and documented
+- [ ] Model comparison baseline saved
 
 **Security & Compliance**
 - [ ] Credentials in Key Vault/env vars
@@ -359,9 +289,9 @@ Output JSON: {"result": <int>, "reason": "<text>"}
 - OpenTelemetry: [opentelemetry.io](https://opentelemetry.io)
 
 **AI Toolkit**:
-- Model Catalog: `Ctrl+Shift+P` → `AI Toolkit: Model Catalog`
-- Trace Viewer: `Ctrl+Shift+P` → `AI Toolkit: Open Trace Viewer`
-- Playground: `Ctrl+Shift+P` → `AI Toolkit: Model Playground`
+- Model Catalog: `Ctrl+Shift+P` -> `AI Toolkit: Model Catalog`
+- Trace Viewer: `Ctrl+Shift+P` -> `AI Toolkit: Open Trace Viewer`
+- Playground: `Ctrl+Shift+P` -> `AI Toolkit: Model Playground`
 
 **Security**:
 - OWASP AI Security: [owasp.org/AI-Security-and-Privacy-Guide](https://owasp.org/www-project-ai-security-and-privacy-guide/)
@@ -369,7 +299,30 @@ Output JSON: {"result": <int>, "reason": "<text>"}
 
 ---
 
-**Related**: [AGENTS.md](../AGENTS.md) for agent behavior guidelines • [Skills.md](../Skills.md) for general production practices
+**Related**: [AGENTS.md](../../../../AGENTS.md) for agent behavior guidelines - [Skills.md](../../../../Skills.md) for general production practices
 
 **Last Updated**: January 17, 2026
 
+## Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| [`scaffold-agent.py`](scripts/scaffold-agent.py) | Scaffold AI agent project (Python/.NET) with tracing & eval | `python scripts/scaffold-agent.py --name my-agent [--pattern multi-agent] [--with-eval]` |
+| [`validate-agent-checklist.ps1`](scripts/validate-agent-checklist.ps1) | Validate agent project against production checklist | `./scripts/validate-agent-checklist.ps1 [-Path ./my-agent] [-Strict]` |
+| [`check-model-drift.ps1`](scripts/check-model-drift.ps1) | Validate model pinning, data drift signals, and judge LLM readiness | `./scripts/check-model-drift.ps1 [-Path ./my-agent] [-Strict]` |
+| [`run-model-comparison.py`](scripts/run-model-comparison.py) | Run eval suite against multiple models and generate comparison report | `python scripts/run-model-comparison.py --config config/models.yaml --dataset evaluation/core.jsonl` |
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| Model not found | Verify model deployment in Foundry portal and check endpoint URL |
+| Tracing not appearing | Ensure AIInferenceInstrumentor().instrument() called before agent creation |
+| Agent loops indefinitely | Set max_turns limit and add termination conditions |
+
+## References
+
+- [Tracing And Evaluation](references/tracing-and-evaluation.md)
+- [Multi Model Patterns](references/multi-model-patterns.md)
+- [Model Drift And Judge Patterns](references/model-drift-judge-patterns.md)
+- [Model Change Test Automation](references/model-change-test-automation.md)

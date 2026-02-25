@@ -1,100 +1,33 @@
 ---
 name: code-review-and-audit
-description: 'Systematic code review and audit practices including automated checks, security audits, compliance verification, and review checklists.'
+description: 'Conduct systematic code reviews and audits including automated checks, security audits, compliance verification, and review checklists. Use when reviewing pull requests, performing security audits, verifying coding standards compliance, or setting up automated code review workflows.'
 ---
 
 # Code Review & Audit
 
-> **Purpose**: Systematic validation of implementations against production guardrails.  
+> **Purpose**: Systematic validation of implementations against production guardrails. 
 > **Focus**: Self-review automation, manual review checklists, security audits, compliance verification.
 
 ---
 
-## Pre-Review Automated Checks
+## When to Use This Skill
 
-Run these before requesting human review or deploying.
+- Reviewing pull requests for code quality
+- Performing security audits on codebases
+- Verifying coding standards compliance
+- Setting up automated code review pipelines
+- Conducting pre-merge quality gates
 
-### Quick Check Script
+## Prerequisites
 
-```bash
-# Run all automated checks
-./scripts/pre-review-check.sh
-
-# Or manually:
-dotnet format --verify-no-changes
-dotnet build --no-incremental
-dotnet test --collect:"XPlat Code Coverage"
-dotnet list package --vulnerable --include-transitive
-```
-
-### PowerShell Pre-Review Script
-
-```powershell
-# scripts/Pre-Review-Check.ps1
-Write-Host "=== Pre-Review Automated Checks ===" -ForegroundColor Cyan
-
-# 1. Format Check
-Write-Host "`n[1/6] Checking code formatting..." -ForegroundColor Yellow
-dotnet format --verify-no-changes
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Format issues found. Run 'dotnet format'" -ForegroundColor Red
-    exit 1
-}
-
-# 2. Build
-Write-Host "`n[2/6] Building solution..." -ForegroundColor Yellow
-dotnet build --no-incremental
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build failed" -ForegroundColor Red
-    exit 1
-}
-
-# 3. Tests
-Write-Host "`n[3/6] Running tests..." -ForegroundColor Yellow
-dotnet test --no-build --verbosity minimal --collect:"XPlat Code Coverage"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Tests failed" -ForegroundColor Red
-    exit 1
-}
-
-# 4. Coverage Check (requires ReportGenerator)
-Write-Host "`n[4/6] Checking code coverage..." -ForegroundColor Yellow
-$coverageFile = Get-ChildItem -Path "TestResults" -Filter "coverage.cobertura.xml" -Recurse | Select-Object -First 1
-if ($coverageFile) {
-    $xml = [xml](Get-Content $coverageFile.FullName)
-    $coverage = [math]::Round([decimal]$xml.coverage.'line-rate' * 100, 2)
-    Write-Host "Coverage: $coverage%" -ForegroundColor Cyan
-    if ($coverage -lt 80) {
-        Write-Host "⚠️  Coverage below 80% threshold" -ForegroundColor Yellow
-    }
-}
-
-# 5. Security Vulnerabilities
-Write-Host "`n[5/6] Checking for vulnerable packages..." -ForegroundColor Yellow
-dotnet list package --vulnerable --include-transitive
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Vulnerable packages found" -ForegroundColor Red
-    exit 1
-}
-
-# 6. Static Analysis (if SonarScanner installed)
-if (Get-Command "dotnet-sonarscanner" -ErrorAction SilentlyContinue) {
-    Write-Host "`n[6/6] Running SonarQube analysis..." -ForegroundColor Yellow
-    dotnet sonarscanner begin /k:"project-key"
-    dotnet build
-    dotnet sonarscanner end
-}
-
-Write-Host "`n✅ All automated checks passed!" -ForegroundColor Green
-```
-
----
+- Git and GitHub/Azure DevOps familiarity
+- Code analysis tools (ESLint, Roslyn Analyzers, etc.)
 
 ## Code Review Checklist
 
 ### Architecture & Design (AGENTS.md Alignment)
 
-- [ ] **Research → Design → Implement** workflow followed
+- [ ] **Research -> Design -> Implement** workflow followed
 - [ ] Architecture documented (ADRs for significant decisions)
 - [ ] SOLID principles adhered to (especially SRP, DIP)
 - [ ] Design patterns used appropriately (not over-engineered)
@@ -142,7 +75,7 @@ Write-Host "`n✅ All automated checks passed!" -ForegroundColor Green
 - [ ] **CORS configured** correctly (not AllowAnyOrigin)
 - [ ] **Rate limiting** enabled on public APIs
 - [ ] **Security headers** added (CSP, X-Frame-Options, etc.)
-- [ ] **Passwords hashed** with BCrypt/Argon2 (work factor ≥12)
+- [ ] **Passwords hashed** with BCrypt/Argon2 (work factor 12)
 - [ ] **Dependencies audited** - No known vulnerabilities
 
 ### Testing (80%+ Coverage)
@@ -156,7 +89,7 @@ Write-Host "`n✅ All automated checks passed!" -ForegroundColor Green
 - [ ] **Mocks used properly** - Isolate unit tests
 - [ ] **Tests are fast** (< 1s per unit test)
 - [ ] **Tests are deterministic** - No flaky tests
-- [ ] **Code coverage ≥ 80%** - Verified
+- [ ] **Code coverage 80%** - Verified
 
 ### Performance
 
@@ -200,232 +133,9 @@ Write-Host "`n✅ All automated checks passed!" -ForegroundColor Green
 
 ---
 
-## Security Audit Procedures
-
-### Automated Security Scans
-
-```bash
-# 1. Dependency Vulnerabilities
-dotnet list package --vulnerable --include-transitive
-
-# 2. .NET Security Analyzers
-dotnet add package Microsoft.CodeAnalysis.NetAnalyzers
-dotnet build /p:EnableNETAnalyzers=true /p:AnalysisLevel=latest
-
-# 3. SonarQube (if configured)
-dotnet sonarscanner begin /k:"project-key" /d:sonar.host.url="http://localhost:9000"
-dotnet build
-dotnet sonarscanner end
-
-# 4. OWASP ZAP (for running APIs)
-docker run -t owasp/zap2docker-stable zap-baseline.py -t https://api.myapp.com
-
-# 5. GitHub Advanced Security (in CI/CD)
-# Automatic in GitHub Actions with code scanning enabled
-```
-
-### Manual Security Review
-
-```bash
-# Search for security anti-patterns
-grep -r "AllowAnyOrigin" . --include=*.cs
-grep -r "SELECT.*\+.*WHERE" . --include=*.cs  # SQL concatenation
-grep -r "password.*=.*\"" . --include=*.cs     # Hardcoded passwords
-grep -r "api[_-]?key.*=.*\"" . --include=*.cs  # Hardcoded API keys
-grep -r "\.Wait()" . --include=*.cs            # Blocking async calls
-```
-
-**PowerShell Security Scan**:
-
-```powershell
-# Find security issues
-Write-Host "Scanning for security anti-patterns..." -ForegroundColor Yellow
-
-$patterns = @{
-    "Hardcoded Secrets" = 'password|apikey|secret|connectionstring.*=.*"[^"]+"'
-    "SQL Injection Risk" = 'SELECT.*\+|ExecuteSqlRaw.*\+'
-    "CORS Issues" = 'AllowAnyOrigin|AllowAnyHeader|AllowAnyMethod'
-    "Blocking Async" = '\.Wait\(\)|\.Result[^a-zA-Z]'
-}
-
-foreach ($pattern in $patterns.GetEnumerator()) {
-    Write-Host "`nChecking: $($pattern.Key)" -ForegroundColor Cyan
-    Get-ChildItem -Recurse -Include *.cs | Select-String -Pattern $pattern.Value
-}
-```
-
----
-
-## Compliance Verification
-
-### OWASP Top 10 (2025) Checklist
-
-- [ ] **A01: Broken Access Control** - Authorization on all endpoints
-- [ ] **A02: Cryptographic Failures** - HTTPS, encrypted data at rest
-- [ ] **A03: Injection** - Parameterized queries, input validation
-- [ ] **A04: Insecure Design** - Threat modeling, secure patterns
-- [ ] **A05: Security Misconfiguration** - No default credentials, hardened config
-- [ ] **A06: Vulnerable Components** - Dependencies updated, no CVEs
-- [ ] **A07: Authentication Failures** - MFA, rate limiting, secure sessions
-- [ ] **A08: Software/Data Integrity** - Signed packages, CI/CD security
-- [ ] **A09: Logging Failures** - Security events logged, alerting configured
-- [ ] **A10: SSRF** - Validate/sanitize URLs, whitelist allowed domains
-
-### Production Readiness (AGENTS.md Checklist)
-
-**Development**
-- [ ] Functionality verified with edge cases
-- [ ] Type annotations and XML docs complete
-- [ ] Error handling with logging
-- [ ] Input validation/sanitization
-- [ ] No hardcoded secrets
-
-**Testing & Quality**
-- [ ] Unit, integration, e2e tests passing (80%+ coverage)
-- [ ] Linters and formatters passing
-- [ ] No code duplication or dead code
-
-**Security**
-- [ ] SQL queries parameterized
-- [ ] Auth/authz implemented
-- [ ] OWASP Top 10 addressed
-
-**Operations**
-- [ ] Structured logging, metrics, alerts
-- [ ] Health checks (liveness/readiness)
-- [ ] Config externalized per environment
-- [ ] Dependencies version-pinned
-- [ ] Database migrations tested
-- [ ] CI/CD pipeline passing
-- [ ] Deployment rollback strategy defined
-
----
-
-## Review Tools
-
-### Static Analysis
-
-| Tool | Purpose | Command |
-|------|---------|---------|
-| **Roslyn Analyzers** | .NET code analysis | `dotnet build /p:AnalysisLevel=latest` |
-| **SonarQube** | Code quality, security | `dotnet sonarscanner begin/end` |
-| **StyleCop** | C# style rules | `dotnet add package StyleCop.Analyzers` |
-| **Security Code Scan** | Security vulnerabilities | `dotnet add package SecurityCodeScan.VS2019` |
-
-### Coverage Tools
-
-```bash
-# Generate coverage report
-dotnet test --collect:"XPlat Code Coverage"
-
-# Install ReportGenerator
-dotnet tool install -g dotnet-reportgenerator-globaltool
-
-# Generate HTML report
-reportgenerator \
-  -reports:"**/coverage.cobertura.xml" \
-  -targetdir:"coveragereport" \
-  -reporttypes:Html
-
-# Open report
-start coveragereport/index.html  # Windows
-open coveragereport/index.html   # macOS
-```
-
-### CI/CD Integration
-
-**GitHub Actions** (.github/workflows/review.yml):
-
-```yaml
-name: Code Review Checks
-
-on: [pull_request]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: '8.0.x'
-      
-      - name: Restore dependencies
-        run: dotnet restore
-      
-      - name: Format check
-        run: dotnet format --verify-no-changes
-      
-      - name: Build
-        run: dotnet build --no-restore
-      
-      - name: Test with coverage
-        run: dotnet test --no-build --collect:"XPlat Code Coverage"
-      
-      - name: Security scan
-        run: dotnet list package --vulnerable --include-transitive
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-```
-
----
-
-## Review Workflow
-
-### 1. Self-Review (Pre-PR)
-
-```bash
-# Run automated checks
-./scripts/pre-review-check.sh
-
-# Review own changes
-git diff main...HEAD
-
-# Check file changes
-git diff --name-only main...HEAD
-
-# Review commit messages
-git log main..HEAD --oneline
-```
-
-### 2. Submit for Review
-
-```bash
-# Create PR with template
-gh pr create --title "feat(auth): Add OAuth integration" \
-  --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
-```
-
-### 3. Address Feedback
-
-```bash
-# Make changes
-git add .
-git commit -m "fix: Address review feedback"
-
-# Update PR
-git push origin feature-branch
-
-# Re-run checks
-./scripts/pre-review-check.sh
-```
-
-### 4. Final Approval
-
-- [ ] All review comments addressed
-- [ ] CI/CD pipeline passing
-- [ ] Code coverage maintained/improved
-- [ ] Security scan clean
-- [ ] Two approvals received (if required)
-
----
-
 ## Best Practices
 
-### ✅ DO
+### [PASS] DO
 
 - **Automate checks** - Pre-commit hooks, CI/CD
 - **Review incrementally** - Small, focused PRs
@@ -435,7 +145,7 @@ git push origin feature-branch
 - **Test audit scripts** - Verify they catch issues
 - **Update checklists** - As standards evolve
 
-### ❌ DON'T
+### [FAIL] DON'T
 
 - **Skip automated checks** - Always run before PR
 - **Large PRs** - > 400 lines hard to review
@@ -470,7 +180,26 @@ reportgenerator -reports:"**/coverage.cobertura.xml" -targetdir:"coverage"
 
 ---
 
-**See Also**: [AGENTS.md](../AGENTS.md) • [02-testing.md](02-testing.md) • [04-security.md](04-security.md) • [16-remote-git-operations.md](16-remote-git-operations.md)
+**See Also**: [AGENTS.md](../../../../AGENTS.md) - [Testing](../testing/SKILL.md) - [Security](../../architecture/security/SKILL.md) - [Remote Git Ops](../../operations/remote-git-operations/SKILL.md)
 
 **Last Updated**: January 13, 2026
 
+## Scripts
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| [`run-checklist.ps1`](scripts/run-checklist.ps1) | Automated code review checklist (large files, TODOs, secrets, tests) | `./scripts/run-checklist.ps1 [-Path ./src]` |
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| False positives from linters | Configure rule exclusions in .eslintrc or .editorconfig |
+| Review backlog growing | Set SLA for review turnaround, use auto-assignment for reviewers |
+| Security scan too slow | Run SAST incrementally on changed files only in CI pipeline |
+
+## References
+
+- [Pre Review Automation](references/pre-review-automation.md)
+- [Security Audit Compliance](references/security-audit-compliance.md)
+- [Review Tools Workflow](references/review-tools-workflow.md)

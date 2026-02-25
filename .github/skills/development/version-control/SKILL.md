@@ -1,6 +1,11 @@
 ---
-name: version-control
-description: 'Effective Git workflows including commit conventions, branching strategies, pull request best practices, and merge conflict resolution.'
+name: "version-control"
+description: 'Apply effective Git workflows including commit conventions, branching strategies, and pull request best practices. Use when writing commit messages, choosing branching strategies, configuring git hooks, resolving merge conflicts, or implementing semantic versioning.'
+metadata:
+ author: "AgentX"
+ version: "1.0.0"
+ created: "2025-01-15"
+ updated: "2025-01-15"
 ---
 
 # Version Control
@@ -8,6 +13,40 @@ description: 'Effective Git workflows including commit conventions, branching st
 > **Purpose**: Effective use of Git for collaboration and code management.
 
 ---
+
+## When to Use This Skill
+
+- Writing Git commit messages following conventions
+- Choosing a branching strategy
+- Configuring Git hooks for quality gates
+- Resolving merge conflicts
+- Implementing semantic versioning with Git tags
+
+## Prerequisites
+
+- Git 2.30+ installed
+- Text editor configured for Git
+
+## Decision Tree
+
+```
+Git operation?
++- Starting new work?
+| +- Feature -> branch from main: feature/issue-123-description
+| +- Bug fix -> branch from main: fix/issue-456-description
+| - Hotfix -> branch from release: hotfix/critical-issue
++- Committing?
+| +- Small, atomic changes (one logical change per commit)
+| - Format: type(scope): description (#issue)
++- Merging?
+| +- Feature branch -> squash merge to main
+| +- Release branch -> merge commit (preserve history)
+| - Conflict? -> Rebase feature on main, resolve, re-push
+- Undoing?
+ +- Uncommitted changes? -> git stash or git checkout
+ +- Last commit (not pushed)? -> git reset --soft HEAD~1
+ - Pushed commit? -> git revert (never force-push shared branches)
+```
 
 ## Commit Messages
 
@@ -112,221 +151,20 @@ git push origin main --tags
 
 ---
 
-## .gitignore for C#
+## Scripts
 
-```gitignore
-# Build results
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
-x64/
-x86/
-[Aa]rm/
-[Aa]rm64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| [`setup-hooks.ps1`](scripts/setup-hooks.ps1) | Install Git hooks (pre-commit, commit-msg) for quality enforcement | `./scripts/setup-hooks.ps1 [-Mode native]` |
 
-# Visual Studio
-.vs/
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-*.userprefs
+## Troubleshooting
 
-# ReSharper
-_ReSharper*/
-*.[Rr]e[Ss]harper
-*.DotSettings.user
+| Issue | Solution |
+|-------|----------|
+| Merge conflict in binary files | Use Git LFS for binaries, prefer text-based formats where possible |
+| Git hook not running | Check executable permissions (chmod +x), verify .git/hooks/ path |
+| Detached HEAD state | Create a branch from current state: git checkout -b recovery-branch |
 
-# NuGet
-*.nupkg
-*.snupkg
-**/packages/*
-!**/packages/build/
-project.lock.json
-project.fragment.lock.json
-artifacts/
+## References
 
-# Test results
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
-*.trx
-*.coverage
-*.coveragexml
-
-# ASP.NET Scaffolding
-ScaffoldingReadMe.txt
-
-# .NET Core
-appsettings.Development.json
-appsettings.Local.json
-*.user.json
-
-# User secrets
-secrets.json
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# Azure
-*.pubxml
-*.azurePubxml
-publish/
-
-# Database
-*.mdf
-*.ldf
-*.ndf
-
-# Local History
-.localhistory/
-
-# Rider
-.idea/
-*.sln.iml
-```
-
----
-
-## Git Hooks for C#
-
-### pre-commit hook (format checking)
-
-Create `.git/hooks/pre-commit`:
-
-```bash
-#!/bin/sh
-# Format C# files before commit
-
-echo "Running dotnet format..."
-dotnet format --verify-no-changes
-
-if [ $? -ne 0 ]; then
-  echo "Code formatting issues detected. Run 'dotnet format' to fix."
-  exit 1
-fi
-
-echo "Running tests..."
-dotnet test --no-build --verbosity quiet
-
-if [ $? -ne 0 ]; then
-  echo "Tests failed. Commit aborted."
-  exit 1
-fi
-
-exit 0
-```
-
-### commit-msg hook (validate commit messages)
-
-Create `.git/hooks/commit-msg`:
-
-```bash
-#!/bin/sh
-# Validate commit message format
-
-commit_msg_file=$1
-commit_msg=$(cat "$commit_msg_file")
-
-# Check if commit message matches conventional commits format
-pattern="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build)(\(.+\))?: .{1,50}"
-
-if ! echo "$commit_msg" | grep -qE "$pattern"; then
-  echo "ERROR: Commit message does not follow conventional commits format"
-  echo "Expected: type(scope): description"
-  echo "Example: feat(auth): Add login endpoint"
-  exit 1
-fi
-
-exit 0
-```
-
----
-
-## Git Configuration for C#
-
-```bash
-# User configuration
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-
-# Editor
-git config --global core.editor "code --wait"
-
-# Line endings (Windows)
-git config --global core.autocrlf true
-
-# Aliases
-git config --global alias.co checkout
-git config --global alias.br branch
-git config --global alias.ci commit
-git config --global alias.st status
-git config --global alias.unstage 'reset HEAD --'
-git config --global alias.last 'log -1 HEAD'
-git config --global alias.visual '!gitk'
-
-# Diff tool
-git config --global diff.tool vscode
-git config --global difftool.vscode.cmd 'code --wait --diff $LOCAL $REMOTE'
-
-# Merge tool
-git config --global merge.tool vscode
-git config --global mergetool.vscode.cmd 'code --wait $MERGED'
-```
-
----
-
-## Semantic Versioning with Git Tags
-
-```bash
-# Format: MAJOR.MINOR.PATCH
-# MAJOR: Breaking changes
-# MINOR: New features (backward compatible)
-# PATCH: Bug fixes
-
-# Create annotated tag
-git tag -a v1.2.3 -m "Release version 1.2.3"
-
-# Push tags
-git push origin v1.2.3
-# Or push all tags
-git push origin --tags
-
-# List tags
-git tag -l
-
-# View tag details
-git show v1.2.3
-
-# Delete tag
-git tag -d v1.2.3
-git push origin :refs/tags/v1.2.3
-
-# Checkout specific version
-git checkout tags/v1.2.3 -b version-1.2.3
-```
-
----
-
-**Related Skills**:
-- [Code Organization](08-code-organization.md)
-- [Documentation](11-documentation.md)
-
+- [Git Config Hooks Versioning](references/git-config-hooks-versioning.md)

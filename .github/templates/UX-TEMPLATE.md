@@ -1,11 +1,35 @@
-# UX Design: {Feature Name}
+---
+inputs:
+ feature_name:
+ description: "Name of the feature being designed"
+ required: true
+ default: ""
+ issue_number:
+ description: "GitHub issue number for this feature"
+ required: true
+ default: ""
+ epic_id:
+ description: "Parent Epic issue number"
+ required: false
+ default: ""
+ designer:
+ description: "Designer name (agent or person)"
+ required: false
+ default: "UX Designer Agent"
+ date:
+ description: "Design date (YYYY-MM-DD)"
+ required: false
+ default: "${current_date}"
+---
 
-**Feature**: #{feature-id}  
-**Epic**: #{epic-id}  
-**Status**: Draft | Review | Approved  
-**Designer**: {Agent/Person}  
-**Date**: {YYYY-MM-DD}  
-**Related PRD**: [PRD-{epic-id}.md](../prd/PRD-{epic-id}.md)
+# UX Design: ${feature_name}
+
+**Feature**: #${issue_number} 
+**Epic**: #${epic_id} 
+**Status**: Draft | Review | Approved 
+**Designer**: ${designer} 
+**Date**: ${date} 
+**Related PRD**: [PRD-${epic_id}.md](../prd/PRD-${epic_id}.md)
 
 ---
 
@@ -67,42 +91,43 @@
 ## 3. User Flows
 
 ### 3.1 Primary Flow: {Action Name}
-**Trigger**: {What initiates this flow - e.g., User clicks "Create Account"}  
-**Goal**: {What user wants to accomplish}  
+**Trigger**: {What initiates this flow - e.g., User clicks "Create Account"} 
+**Goal**: {What user wants to accomplish} 
 **Preconditions**: {Required state - e.g., User is logged out}
 
 **Flow Diagram**:
-```
-[Start: Landing Page]
-        ↓
-[User clicks "Sign Up"]
-        ↓
-[Registration Form]
-        ↓
-    ┌───┴───┐
-    ↓       ↓
-[Valid]  [Invalid]
-    ↓       ↓
-[Success] [Error Message]
-    ↓       ↓
-[Dashboard] [Re-enter Data]
+```mermaid
+flowchart TD
+ A[" Start: Landing Page"] --> B["User clicks 'Sign Up'"]
+ B --> C[" Registration Form"]
+ C --> D{Validation}
+ D -->|Valid| E["[PASS] Success"]
+ D -->|Invalid| F["[FAIL] Error Message"]
+ E --> G[" Dashboard"]
+ F --> H["Re-enter Data"]
+ H --> C
+
+ style A fill:#E3F2FD,stroke:#1565C0
+ style E fill:#E8F5E9,stroke:#2E7D32
+ style F fill:#FFEBEE,stroke:#C62828
+ style G fill:#E8F5E9,stroke:#2E7D32
 ```
 
 **Detailed Steps**:
 1. **User Action**: Clicks "Sign Up" button
-   - **System Response**: Displays registration form modal
-   - **Screen**: [Screen 1: Registration Modal](#screen-1-registration-modal)
+ - **System Response**: Displays registration form modal
+ - **Screen**: [Screen 1: Registration Modal](#screen-1-registration-modal)
 
 2. **User Action**: Fills form (name, email, password)
-   - **System Response**: Real-time validation feedback
-   - **Validation**: Email format, password strength indicator
+ - **System Response**: Real-time validation feedback
+ - **Validation**: Email format, password strength indicator
 
 3. **User Action**: Clicks "Create Account"
-   - **System Response**: Shows loading spinner
-   - **API Call**: POST /api/v1/users
+ - **System Response**: Shows loading spinner
+ - **API Call**: POST /api/v1/users
 
 4. **Success State**: Redirect to dashboard with welcome message
-   - **Screen**: [Screen 2: Dashboard](#screen-2-dashboard)
+ - **Screen**: [Screen 2: Dashboard](#screen-2-dashboard)
 
 **Alternative Flows**:
 - **4a. Validation Error**: Highlight invalid fields, show inline error messages
@@ -121,37 +146,37 @@
 ## 4. Wireframes
 
 ### Screen 1: Registration Modal
-**Purpose**: Capture user information for account creation  
+**Purpose**: Capture user information for account creation 
 **Context**: Overlay on landing page
 
 **Layout**:
 ```
-╔═══════════════════════════════════════════════════════╗
-║                   [✕ Close]                           ║
-║                                                       ║
-║   Create Your Account                                 ║
-║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ║
-║                                                       ║
-║   Full Name                                           ║
-║   [_______________________________]                   ║
-║                                                       ║
-║   Email Address                                       ║
-║   [_______________________________]                   ║
-║   ✓ Valid email format                                ║
-║                                                       ║
-║   Password                                            ║
-║   [_______________________________] [👁]              ║
-║   ░░░░░░░░░░░░░░░░░░░░ Weak | Medium | Strong        ║
-║                                                       ║
-║   [ ] I agree to Terms of Service                     ║
-║                                                       ║
-║   ┌────────────────────────┐                          ║
-║   │   Create Account   →   │                          ║
-║   └────────────────────────┘                          ║
-║                                                       ║
-║   Already have an account? [Log in]                   ║
-║                                                       ║
-╚═══════════════════════════════════════════════════════╝
++=======================================================+
+| [ Close] |
+| |
+| Create Your Account |
+| --------------------------------------------- |
+| |
+| Full Name |
+| [_______________________________] |
+| |
+| Email Address |
+| [_______________________________] |
+| [PASS] Valid email format |
+| |
+| Password |
+| [_______________________________] [] |
+| Weak | Medium | Strong |
+| |
+| [ ] I agree to Terms of Service |
+| |
+| ------------------------ |
+| | Create Account -> | |
+| ------------------------ |
+| |
+| Already have an account? [Log in] |
+| |
++=======================================================+
 ```
 
 **Responsive Behavior**:
@@ -160,30 +185,30 @@
 - **Mobile (<768px)**: Full screen with padding
 
 ### Screen 2: Dashboard
-**Purpose**: Landing page after successful registration  
+**Purpose**: Landing page after successful registration 
 **Context**: Authenticated user view
 
 **Layout**:
 ```
-╔═══════════════════════════════════════════════════════════╗
-║ ☰ Logo          [Search...]      [🔔] [Profile ▼]        ║
-╠═══════════════════════════════════════════════════════════╣
-║ ┌─────────┐   ┌────────────────────────────────────────┐ ║
-║ │         │   │                                        │ ║
-║ │ Nav 1   │   │   Welcome, {Name}! 🎉                 │ ║
-║ │         │   │                                        │ ║
-║ │ Nav 2   │   │   Get started with these quick steps: │ ║
-║ │         │   │                                        │ ║
-║ │ Nav 3   │   │   1. [ ] Complete your profile        │ ║
-║ │         │   │   2. [ ] Connect your first app       │ ║
-║ │ Nav 4   │   │   3. [ ] Invite team members          │ ║
-║ │         │   │                                        │ ║
-║ └─────────┘   │   ┌─────────────────┐                 │ ║
-║               │   │  Get Started →  │                 │ ║
-║               │   └─────────────────┘                 │ ║
-║               │                                        │ ║
-║               └────────────────────────────────────────┘ ║
-╚═══════════════════════════════════════════════════════════╝
++===========================================================+
+| Logo [Search...] [] [Profile ] |
+===========================================================
+| --------- ---------------------------------------- |
+| | | | | |
+| | Nav 1 | | Welcome, {Name}! | |
+| | | | | |
+| | Nav 2 | | Get started with these quick steps: | |
+| | | | | |
+| | Nav 3 | | 1. [ ] Complete your profile | |
+| | | | 2. [ ] Connect your first app | |
+| | Nav 4 | | 3. [ ] Invite team members | |
+| | | | | |
+| --------- | ----------------- | |
+| | | Get Started -> | | |
+| | ----------------- | |
+| | | |
+| ---------------------------------------- |
++===========================================================+
 ```
 
 ### Screen 3: {Screen Name}
@@ -194,7 +219,7 @@
 ## 5. Component Specifications
 
 ### 5.1 Button: Primary CTA
-**Purpose**: Main call-to-action for forms and critical actions  
+**Purpose**: Main call-to-action for forms and critical actions 
 **Usage**: Submit buttons, primary actions
 
 **States**:
@@ -213,17 +238,17 @@
 **Specifications**:
 ```css
 .btn-primary {
-  padding: 12px 24px;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: 8px;
-  border: none;
-  transition: all 0.2s ease;
+ padding: 12px 24px;
+ font-size: 16px;
+ font-weight: 600;
+ border-radius: 8px;
+ border: none;
+ transition: all 0.2s ease;
 }
 ```
 
 ### 5.2 Input Field: Text Input
-**Purpose**: Single-line text entry  
+**Purpose**: Single-line text entry 
 **Usage**: Forms, search boxes
 
 **States**:
@@ -236,11 +261,11 @@
 **Specifications**:
 ```css
 .input-field {
-  padding: 10px 12px;
-  font-size: 14px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  transition: border-color 0.2s;
+ padding: 10px 12px;
+ font-size: 14px;
+ border: 1px solid #ced4da;
+ border-radius: 4px;
+ transition: border-color 0.2s;
 }
 ```
 
@@ -256,10 +281,10 @@
 - **Container Max Width**: 1200px
 - **Gutter Width**: 24px
 - **Breakpoints**:
-  - Mobile: 0-767px
-  - Tablet: 768-1023px
-  - Desktop: 1024px+
-  - Large Desktop: 1440px+
+ - Mobile: 0-767px
+ - Tablet: 768-1023px
+ - Desktop: 1024px+
+ - Large Desktop: 1440px+
 
 ### 6.2 Typography
 **Font Family**: 
@@ -303,12 +328,12 @@
 **Base Unit**: 8px
 
 **Scale**:
-- xs: 4px (0.5 × base)
-- sm: 8px (1 × base)
-- md: 16px (2 × base)
-- lg: 24px (3 × base)
-- xl: 32px (4 × base)
-- xxl: 48px (6 × base)
+- xs: 4px (0.5 base)
+- sm: 8px (1 base)
+- md: 16px (2 base)
+- lg: 24px (3 base)
+- xl: 32px (4 base)
+- xxl: 48px (6 base)
 
 ### 6.5 Elevation (Shadows)
 - **Level 1**: `box-shadow: 0 1px 3px rgba(0,0,0,0.12)`
@@ -327,7 +352,7 @@
 ## 7. Interactions & Animations
 
 ### 7.1 Transitions
-**Standard Duration**: 200ms  
+**Standard Duration**: 200ms 
 **Easing**: ease-in-out
 
 **Common Transitions**:
@@ -356,10 +381,10 @@
 - **Tab Order**: Logical flow (top-to-bottom, left-to-right)
 - **Focus Indicators**: 2px solid blue outline on all focusable elements
 - **Keyboard Shortcuts**: 
-  - `Escape`: Close modals/dropdowns
-  - `Enter`: Submit forms, activate buttons
-  - `Space`: Toggle checkboxes
-  - `Arrow Keys`: Navigate lists/menus
+ - `Escape`: Close modals/dropdowns
+ - `Enter`: Submit forms, activate buttons
+ - `Space`: Toggle checkboxes
+ - `Arrow Keys`: Navigate lists/menus
 
 ### 8.2 Screen Readers
 - **ARIA Labels**: All interactive elements labeled
@@ -374,9 +399,9 @@
 - UI Components: 3:1
 
 **Tested Combinations**:
-- Primary Blue (#007bff) on White: 4.68:1 ✅
-- Text Primary (#212529) on White: 16.07:1 ✅
-- Text Secondary (#6c757d) on White: 4.67:1 ✅
+- Primary Blue (#007bff) on White: 4.68:1 [PASS]
+- Text Primary (#212529) on White: 16.07:1 [PASS]
+- Text Secondary (#6c757d) on White: 4.67:1 [PASS]
 
 ### 8.4 Other Considerations
 - **Focus Management**: Auto-focus on modal open, return focus on close
@@ -391,13 +416,13 @@
 ### Mobile (<768px)
 - **Layout**: Single column, full width
 - **Navigation**: Hamburger menu
-- **Touch Targets**: Minimum 44×44px
+- **Touch Targets**: Minimum 4444px
 - **Font Size**: Minimum 16px (prevent zoom on focus)
 
 ### Tablet (768-1023px)
 - **Layout**: Two-column grid where appropriate
 - **Navigation**: Collapsed sidebar or top nav
-- **Touch Targets**: Minimum 44×44px
+- **Touch Targets**: Minimum 4444px
 
 ### Desktop (1024px+)
 - **Layout**: Multi-column, max 1200px container
@@ -408,17 +433,20 @@
 
 ## 10. Interactive Prototypes
 
+> **[WARN] MANDATORY**: HTML/CSS prototypes are REQUIRED per AGENTS.md. Output to `docs/ux/prototypes/`.
+> Prototypes must be production-ready HTML/CSS that engineers can reference for implementation.
+
 ### Prototype Links
-- [Figma Prototype](https://figma.com/...)
-- [HTML Mockup](./prototypes/feature-name.html)
-- [Interactive Demo](https://demo.example.com/feature-name)
+- [HTML/CSS Prototype](../prototypes/{feature-name}/index.html) **(MANDATORY)**
+- [Figma Prototype](https://figma.com/...) _(optional)_
+- [Interactive Demo](https://demo.example.com/feature-name) _(optional)_
 
 ### Prototype Scope
-- ✅ Primary user flow (happy path)
-- ✅ Error states and validation
-- ✅ Loading states
-- ⚠️ Edge cases (documented, not prototyped)
-- ❌ Backend integration (simulated data)
+- [PASS] Primary user flow (happy path)
+- [PASS] Error states and validation
+- [PASS] Loading states
+- [WARN] Edge cases (documented, not prototyped)
+- [FAIL] Backend integration (simulated data)
 
 ---
 
@@ -448,23 +476,23 @@
 
 /* Tablet */
 @media (min-width: 768px) {
-  .container { width: 80%; }
+ .container { width: 80%; }
 }
 
 /* Desktop */
 @media (min-width: 1024px) {
-  .container { max-width: 1200px; }
+ .container { max-width: 1200px; }
 }
 ```
 
 **Animation Implementation**:
 ```css
 .button {
-  transition: transform 0.2s ease;
+ transition: transform 0.2s ease;
 }
 
 .button:active {
-  transform: scale(0.98);
+ transform: scale(0.98);
 }
 ```
 
@@ -509,6 +537,6 @@
 
 ---
 
-**Generated by AgentX UX Designer Agent**  
-**Last Updated**: {YYYY-MM-DD}  
+**Generated by AgentX UX Designer Agent** 
+**Last Updated**: {YYYY-MM-DD} 
 **Version**: 1.0

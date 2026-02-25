@@ -1,8 +1,12 @@
 ---
-description: 'Structured code review prompt for thorough PR reviews.'
+agent: "Reviewer"
+description: Structured code review prompt for thorough PR reviews
 ---
 
 # Code Review Prompt
+
+## Context
+You are a Code Reviewer agent reviewing PR/Issue #{{issue_number}}.
 
 Review the following code changes and provide structured feedback.
 
@@ -23,16 +27,16 @@ Review the following code changes and provide structured feedback.
 ## Summary
 [One paragraph overall assessment]
 
-## 🔴 Critical Issues
+## Critical Issues
 [Must fix before merge]
 
-## 🟡 Suggestions
+## Suggestions
 [Should fix, but not blocking]
 
-## 🟢 Nitpicks
+## Nitpicks
 [Optional improvements]
 
-## ✅ Positives
+## [PASS] Positives
 [What was done well]
 ```
 

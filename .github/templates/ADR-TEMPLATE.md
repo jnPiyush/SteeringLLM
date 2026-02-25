@@ -1,10 +1,44 @@
-# ADR-{ID}: {Decision Title}
+---
+inputs:
+ decision_id:
+ description: "ADR sequential ID number"
+ required: true
+ default: ""
+ decision_title:
+ description: "Short title of the architectural decision"
+ required: true
+ default: ""
+ issue_number:
+ description: "GitHub issue number for this decision"
+ required: true
+ default: ""
+ epic_id:
+ description: "Parent Epic issue number"
+ required: false
+ default: ""
+ date:
+ description: "Decision date (YYYY-MM-DD)"
+ required: false
+ default: "${current_date}"
+ status:
+ description: "Decision status"
+ required: false
+ default: "Accepted"
+ author:
+ description: "Author of this architectural decision"
+ required: false
+ default: ""
+---
 
-**Status**: Accepted | Rejected | Superseded  
-**Date**: {YYYY-MM-DD}  
-**Epic**: #{epic-id}  
-**PRD**: [PRD-{epic-id}.md](../prd/PRD-{epic-id}.md)  
-**UX**: [UX-{feature-id}.md](../ux/UX-{feature-id}.md)
+# ADR-${decision_id}: ${decision_title}
+
+**Status**: ${status}
+**Date**: ${date} 
+**Author**: ${author} 
+**Epic**: #${epic_id} 
+**Issue**: #${issue_number} 
+**PRD**: [PRD-${epic_id}.md](../prd/PRD-${epic_id}.md) 
+**UX**: [UX-${issue_number}.md](../ux/UX-${issue_number}.md)
 
 ---
 
@@ -68,7 +102,7 @@ We will {architectural decision - be specific and actionable}.
 - {Con 2}
 - {Con 3}
 
-**Effort**: S | M | L | XL  
+**Effort**: S | M | L | XL 
 **Risk**: Low | Medium | High
 
 ---
@@ -86,7 +120,7 @@ We will {architectural decision - be specific and actionable}.
 - {Con 1}
 - {Con 2}
 
-**Effort**: S | M | L | XL  
+**Effort**: S | M | L | XL 
 **Risk**: Low | Medium | High
 
 ---
@@ -104,7 +138,7 @@ We will {architectural decision - be specific and actionable}.
 - {Con 1}
 - {Con 2}
 
-**Effort**: S | M | L | XL  
+**Effort**: S | M | L | XL 
 **Risk**: Low | Medium | High
 
 ---
@@ -158,6 +192,66 @@ We chose **Option X** because:
 
 ---
 
+## AI/ML Architecture (if applicable)
+
+> **Trigger**: Include this section when the issue has `needs:ai` label or the PRD includes AI/ML Requirements. If the product does NOT involve AI/ML, skip this section entirely.
+
+### Model Selection Decision
+
+| Model | Provider | Context Window | Cost (per 1M tokens) | Latency | Selected? |
+|-------|----------|---------------|----------------------|---------|-----------|
+| {Model 1} | {Provider} | {window} | {cost} | {latency} | [PASS] / [FAIL] |
+| {Model 2} | {Provider} | {window} | {cost} | {latency} | [PASS] / [FAIL] |
+| {Model 3} | {Provider} | {window} | {cost} | {latency} | [PASS] / [FAIL] |
+
+### Agent Architecture Pattern
+
+- [ ] **Single Agent** - simple tool use, one model call chain
+- [ ] **Multi-Agent Orchestration** - sequential, parallel, or hierarchical agent coordination
+- [ ] **Human-in-the-Loop** - agent proposes, human approves
+- [ ] **Reflection / Self-Correction** - agent evaluates and refines its own output
+- [ ] **RAG Pipeline** - retrieval-augmented generation with knowledge base
+- [ ] **Hybrid** - rule-based preprocessing + AI/ML core + deterministic post-processing
+
+### Inference Pipeline
+
+```mermaid
+graph LR
+ A[" Request"] --> B[" Preprocessing"]
+ B --> C[" Context / RAG"]
+ C --> D[" Model Invocation"]
+ D --> E[" Output Parsing"]
+ E --> F["[PASS] Validation"]
+ F --> G[" Response"]
+
+ style A fill:#E3F2FD,stroke:#1565C0
+ style D fill:#F3E5F5,stroke:#6A1B9A
+ style G fill:#E8F5E9,stroke:#2E7D32
+```
+
+{Describe each stage with specific implementation decisions}
+
+### Evaluation Strategy
+
+| Metric | Evaluator | Threshold | How Measured |
+|--------|-----------|-----------|--------------|
+| {Quality metric} | {Built-in / Custom} | { X} | {Method} |
+| {Latency} | {Timer} | {< Xms} | {P50/P95/P99} |
+| {Cost} | {Token counter} | {< $X/req} | {Aggregated} |
+
+### AI-Specific Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Model hallucination | High | Grounding, RAG, structured output, validation |
+| API rate limits | Medium | Retry with backoff, fallback model, caching |
+| Cost overrun | Medium | Token budgets, model tiering, caching |
+| Latency spikes | Medium | Streaming, async, timeout with fallback |
+
+> **Reference**: Read `.github/skills/ai-systems/ai-agent-development/SKILL.md` for architecture patterns and model guidance.
+
+---
+
 ## References
 
 ### Internal
@@ -180,5 +274,5 @@ We chose **Option X** because:
 
 ---
 
-**Author**: {Agent/Person Name}  
+**Author**: {Agent/Person Name} 
 **Last Updated**: {YYYY-MM-DD}
