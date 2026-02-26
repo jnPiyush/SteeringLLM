@@ -5,33 +5,44 @@
     "context": ".."
   },
 
-  // Install .NET SDK 8.0 and opt out of other Codespaces auto-installed features.
+  // Dev container features required for the demo app
   "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "configureZshAsDefaultShell": false,
+      "upgradePackages": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
     "ghcr.io/devcontainers/features/dotnet:2": {
       "version": "8.0"
     }
   },
 
-  // 16 vCPU Codespace -- GitHub Codespaces 16-core machine ships with 64 GB RAM.
-  // (There is no 16-core/32 GB SKU; the 8-core/32 GB machine is available as an
-  //  alternative -- change cpus to 8 and memory to "32gb" if preferred.)
+  // 8 vCPU Codespace -- sufficient for CPU-based inference with GPT-2 or phi-2.
+  // Increase to cpus: 16 / memory: "64gb" for larger models.
   "hostRequirements": {
-    "cpus": 16,
-    "memory": "64gb",
+    "cpus": 8,
+    "memory": "32gb",
     "storage": "64gb"
   },
 
-  // VS Code extensions for Python + Jupyter + Git
+  // VS Code extensions for Python + Jupyter + Git + Streamlit
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-python.debugpy",
         "ms-toolsai.jupyter",
         "GitHub.copilot",
         "GitHub.copilot-chat",
         "ms-python.black-formatter",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "Streamlit.streamlit"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -50,7 +61,7 @@
   "portsAttributes": {
     "8501": {
       "label": "SteeringLLM Demo",
-      "onAutoForward": "notify"
+      "onAutoForward": "openBrowserOnce"
     }
   },
 
