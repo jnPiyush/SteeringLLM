@@ -547,9 +547,13 @@ class SteeringModel:
             with torch.no_grad():
                 output_ids = self.model.generate(**inputs, **generate_kwargs)
             
+            # Strip input prompt tokens so only new text is returned
+            input_length = inputs["input_ids"].shape[-1]
+            new_ids = output_ids[:, input_length:]
+            
             # Decode outputs
             outputs = self.tokenizer.batch_decode(
-                output_ids,
+                new_ids,
                 skip_special_tokens=True,
             )
             
@@ -599,8 +603,12 @@ class SteeringModel:
         with torch.no_grad():
             output_ids = self.model.generate(**inputs, **generate_kwargs)
 
+        # Strip input prompt tokens so only new text is returned
+        input_length = inputs["input_ids"].shape[-1]
+        new_ids = output_ids[:, input_length:]
+
         outputs = self.tokenizer.batch_decode(
-            output_ids,
+            new_ids,
             skip_special_tokens=True,
         )
 

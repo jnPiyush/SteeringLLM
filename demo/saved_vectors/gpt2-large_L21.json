@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "model_name": "gpt2-large",
+  "layer": 21,
+  "layer_name": "transformer.h.21",
+  "method": "mean_difference",
+  "magnitude": 38.333213806152344,
+  "shape": [
+    1280
+  ],
+  "dtype": "float32",
+  "created_at": "2026-02-26T00:47:52.648969+00:00",
+  "metadata": {
+    "positive_samples": 8,
+    "negative_samples": 8,
+    "batch_size": 8,
+    "max_length": 128
+  }
+}

@@ -37,15 +37,18 @@ class TestGPT2Integration:
         assert gpt2_model.num_layers == 12  # GPT-2 small has 12 layers
     
     def test_generate_without_steering(self, gpt2_model):
-        """Test basic generation works."""
+        """Test basic generation works (returns only new tokens, not prompt)."""
+        prompt = "Hello, my name is"
         output = gpt2_model.generate(
-            "Hello, my name is",
+            prompt,
             max_new_tokens=10,
             do_sample=False,
         )
         
         assert isinstance(output, str)
-        assert len(output) > len("Hello, my name is")
+        assert len(output) > 0
+        # Output should NOT start with the prompt (prompt is stripped)
+        assert not output.startswith(prompt)
     
     def test_discovery_mean_difference(self, gpt2_model):
         """Test mean_difference discovery with real model."""

@@ -105,14 +105,15 @@ def _import_lib():
     return Discovery, SteeringModel, SteeringVector, VectorComposition, get_supported_architectures
 
 
-from demo.presets import PRESETS, get_preset, get_preset_names
+from demo.presets import PRESETS, get_preset, get_preset_names, get_tone_presets, get_role_presets
 
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "gpt2"
+DEFAULT_MODEL = "gpt2"  # 124M params -- fast CPU download; switch to gpt2-large for quality
 VECTOR_DIR = Path("demo/saved_vectors")
+RAG_DATA_DIR = Path("examples/rag-data")  # pre-loaded PDFs for RAG demo
 MAX_VECTORS = 5  # max vectors in composition tab
 
 
@@ -212,12 +213,17 @@ def _sidebar() -> Optional[Any]:
     model_name = st.sidebar.text_input(
         "HuggingFace Model",
         value=DEFAULT_MODEL,
-        help="Any causal-LM on Hugging Face Hub (e.g. gpt2, gpt2-medium).",
+        help="Any causal-LM on Hugging Face Hub (e.g. gpt2, gpt2-medium, gpt2-large).",
     )
 
     if st.sidebar.button("Load Model", type="primary", use_container_width=True):
         st.session_state["model_name"] = model_name
         st.session_state.pop("model_obj", None)  # force reload
+
+    st.sidebar.caption(
+        ":bulb: **Tip**: `gpt2` (124 MB) loads fastest. "
+        "Use `gpt2-large` for noticeably better steering quality."
+    )
 
     if "model_name" not in st.session_state:
         st.session_state["model_name"] = model_name
@@ -272,11 +278,12 @@ def _tab_playground(model: Any) -> None:
         )
 
         if source == "Preset":
-            preset_name = st.selectbox("Preset", get_preset_names(), key="pg_preset")
+            preset_name = st.selectbox("Tone Preset", get_tone_presets(), key="pg_preset")
             preset = get_preset(preset_name)
             st.info(preset["description"])
             positive = preset["positive"]
             negative = preset["negative"]
+            default_prompt = preset.get("default_prompt", "Tell me about yourself and how you see the world.")
 
             with st.expander("View contrast pairs"):
                 c1, c2 = st.columns(2)
@@ -306,6 +313,7 @@ def _tab_playground(model: Any) -> None:
             negative = [
                 s.strip() for s in negative_text.strip().splitlines() if s.strip()
             ]
+            default_prompt = "Tell me about yourself and how you see the world."
 
     # ---- Configuration ----
     with col_cfg:
@@ -346,7 +354,7 @@ def _tab_playground(model: Any) -> None:
             "Max new tokens",
             min_value=20,
             max_value=300,
-            value=100,
+            value=150,
             step=10,
             key="pg_max_tokens",
         )
@@ -364,7 +372,7 @@ def _tab_playground(model: Any) -> None:
     st.markdown("---")
     prompt = st.text_input(
         "Prompt",
-        value="Tell me about yourself and how you see the world.",
+        value=default_prompt,
         key="pg_prompt",
     )
 
@@ -751,6 +759,52 @@ def _tab_inspector(model: Any) -> None:
     df_hist = pd.DataFrame({"value": hist_vals})
     st.bar_chart(df_hist["value"].value_counts(bins=50).sort_index())
 
+    # ---- Export / Download ----
+    st.subheader("Export")
+    exp_col1, exp_col2 = st.columns(2)
+
+    # JSON metadata export
+    export_meta = {
+        "model_name": target_vec.model_name,
+        "layer": target_vec.layer,
+        "layer_name": target_vec.layer_name,
+        "method": target_vec.method,
+        "dimension": target_vec.shape[0],
+        "magnitude": target_vec.magnitude,
+        "dtype": str(target_vec.dtype),
+        "created_at": target_vec.created_at or "n/a",
+        "tensor": [round(float(v), 8) for v in target_vec.tensor.tolist()],
+    }
+    if target_vec.metadata:
+        export_meta["metadata"] = target_vec.metadata
+    json_bytes = json.dumps(export_meta, indent=2).encode("utf-8")
+
+    tag = (
+        f"{target_vec.model_name.replace('/', '_')}"
+        f"_L{target_vec.layer}_{target_vec.method}"
+    )
+    with exp_col1:
+        st.download_button(
+            label="Download vector (JSON)",
+            data=json_bytes,
+            file_name=f"{tag}.json",
+            mime="application/json",
+            key="insp_dl_json",
+        )
+
+    # NumPy .npy export (lightweight, easy to reload)
+    npy_buf = io.BytesIO()
+    np.save(npy_buf, hist_vals)
+    npy_buf.seek(0)
+    with exp_col2:
+        st.download_button(
+            label="Download tensor (.npy)",
+            data=npy_buf,
+            file_name=f"{tag}.npy",
+            mime="application/octet-stream",
+            key="insp_dl_npy",
+        )
+
 
 # ---------------------------------------------------------------------------
 # Tab 5 — Layer Explorer
@@ -776,8 +830,15 @@ def _tab_layer_explorer(model: Any) -> None:
     max_tokens = st.slider("Max tokens", 20, 150, 60, key="le_tok")
 
     num_layers = model.num_layers
-    step = max(1, num_layers // 6)  # sample ~6 layers
-    layers_to_test = list(range(0, num_layers, step))
+    stride = st.slider(
+        "Layer stride",
+        min_value=1,
+        max_value=max(1, num_layers // 2),
+        value=max(1, num_layers // 6),
+        key="le_stride",
+        help="Test every Nth layer. Lower = more layers tested (slower).",
+    )
+    layers_to_test = list(range(0, num_layers, stride))
     if (num_layers - 1) not in layers_to_test:
         layers_to_test.append(num_layers - 1)
 
@@ -811,6 +872,358 @@ def _tab_layer_explorer(model: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tab 6 -- Role / Domain Expertise
+# ---------------------------------------------------------------------------
+def _tab_role_expertise(model: Any) -> None:
+    st.header("👔 Role / Domain Expertise")
+    st.markdown(
+        "Steer the model to respond **like a domain expert** — a doctor, lawyer, "
+        "software engineer, scientist, and more.  "
+        "Compare the baseline (no steering) against the steered output to see "
+        "domain-specific language, terminology, and reasoning emerge."
+    )
+
+    col_src, col_cfg = st.columns([1.2, 0.8])
+    with col_src:
+        role_names = get_role_presets()
+        role_name = st.selectbox("Expert Role", role_names, key="role_preset")
+        preset = get_preset(role_name)
+
+        st.info(f"**{role_name}**: {preset['description']}")
+
+        with st.expander("View contrast pairs (what defines this role)"):
+            c1, c2 = st.columns(2)
+            c1.markdown("**Expert language (positive)**")
+            for p in preset["positive"]:
+                c1.markdown(f"- {_truncate(p, 90)}")
+            c2.markdown("**Non-expert language (negative)**")
+            for n in preset["negative"]:
+                c2.markdown(f"- {_truncate(n, 90)}")
+
+    with col_cfg:
+        st.markdown("### Configuration")
+        num_layers = model.num_layers
+        default_layer = max(
+            0,
+            min(
+                int(preset["recommended_layer_pct"] * num_layers),
+                num_layers - 1,
+            ),
+        )
+        layer = st.slider(
+            "Target layer",
+            min_value=0,
+            max_value=num_layers - 1,
+            value=default_layer,
+            key="role_layer",
+        )
+        alpha = st.slider(
+            "Steering strength (α)",
+            min_value=-5.0,
+            max_value=5.0,
+            value=float(preset["default_alpha"]),
+            step=0.1,
+            key="role_alpha",
+            help="Higher α = stronger expert persona. Too high may cause repetition.",
+        )
+        max_tokens = st.slider(
+            "Max new tokens", 30, 300, 150, step=10, key="role_tokens"
+        )
+        temperature = st.slider(
+            "Temperature", 0.1, 2.0, 0.7, step=0.05, key="role_temp"
+        )
+
+    st.markdown("---")
+    default_prompt = preset.get("default_prompt", "Explain your area of expertise.")
+    prompt = st.text_input(
+        "Prompt",
+        value=default_prompt,
+        key="role_prompt",
+        help="Phrase as a completion starter, not a chat question (base model behavior).",
+    )
+
+    if st.button("▶  Generate", type="primary", key="role_run"):
+        with st.spinner("Discovering role steering vector …"):
+            t0 = time.time()
+            vector, _ = discover_vector(
+                model, preset["positive"], preset["negative"], layer
+            )
+            st.session_state["last_vector"] = vector
+            disc_time = time.time() - t0
+
+        st.success(
+            f"Role vector discovered in **{disc_time:.1f}s** — "
+            f"magnitude: {vector.magnitude:.4f}"
+        )
+
+        col_base, col_steered = st.columns(2)
+
+        with col_base:
+            st.subheader("Baseline (no role steering)")
+            with st.spinner("Generating …"):
+                model.remove_steering()
+                t0 = time.time()
+                baseline = generate_texts(
+                    model,
+                    prompt,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    do_sample=True,
+                )
+                base_time = time.time() - t0
+            st.text_area(
+                "Output",
+                value=baseline,
+                height=280,
+                key="role_baseline_out",
+                disabled=True,
+            )
+            st.caption(f"Generated in {base_time:.1f}s")
+
+        with col_steered:
+            st.subheader(f"Steered as: {role_name} (α={alpha})")
+            with st.spinner("Generating (role-steered) …"):
+                model.remove_steering()
+                t0 = time.time()
+                steered = model.generate_with_steering(
+                    prompt,
+                    vector=vector,
+                    alpha=alpha,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    do_sample=True,
+                )
+                steer_time = time.time() - t0
+            st.text_area(
+                "Output",
+                value=steered,
+                height=280,
+                key="role_steered_out",
+                disabled=True,
+            )
+            st.caption(f"Generated in {steer_time:.1f}s")
+
+        st.markdown(
+            "> **What to look for**: Domain vocabulary, structured reasoning, "
+            "professional framing, and specific terminology appear in the steered "
+            "output but not (or far less) in the baseline."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Tab 7 -- RAG / Document-Grounded Steering
+# ---------------------------------------------------------------------------
+def _tab_rag(model: Any) -> None:
+    st.header("📄 RAG / Document-Grounded Steering")
+    st.markdown(
+        "Upload PDF documents and steer the model to generate answers **grounded "
+        "in your documents** rather than vague or hallucinated content.  "
+        "The steering vector is built from chunks of your PDF as positive examples "
+        "vs generic vague statements as negatives — biasing the model toward your data."
+    )
+
+    # ---- PDF source selection ----
+    source_mode = st.radio(
+        "Document source",
+        ["Upload PDF(s)", "Use pre-loaded sample PDFs"],
+        horizontal=True,
+        key="rag_source_mode",
+    )
+
+    pdf_bytes_list: List[bytes] = []
+    pdf_names: List[str] = []
+
+    if source_mode == "Upload PDF(s)":
+        uploaded = st.file_uploader(
+            "Upload one or more PDF files",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="rag_uploader",
+        )
+        if uploaded:
+            for f in uploaded:
+                pdf_bytes_list.append(f.read())
+                pdf_names.append(f.name)
+    else:
+        # Use pre-loaded PDFs from examples/rag-data/
+        available_pdfs = sorted(RAG_DATA_DIR.glob("*.pdf")) if RAG_DATA_DIR.exists() else []
+        if not available_pdfs:
+            st.warning(
+                f"No PDFs found in `{RAG_DATA_DIR}`. "
+                "Upload a PDF using the other source mode."
+            )
+        else:
+            selected_names = st.multiselect(
+                "Select PDF(s) to use",
+                [p.name for p in available_pdfs],
+                default=[available_pdfs[0].name],
+                key="rag_preloaded_select",
+            )
+            for name in selected_names:
+                path = RAG_DATA_DIR / name
+                pdf_bytes_list.append(path.read_bytes())
+                pdf_names.append(name)
+
+    if not pdf_bytes_list:
+        st.info("Select or upload at least one PDF to continue.")
+        return
+
+    st.success(f"Loaded: {', '.join(pdf_names)}")
+
+    # ---- Extract & chunk ----
+    try:
+        from demo.pdf_utils import (
+            extract_text_from_pdf,
+            chunk_text,
+            build_rag_contrast_pairs,
+            summarize_chunks,
+        )
+    except ImportError as e:
+        st.error(
+            f"PDF utilities failed to import: {e}\n\n"
+            "Install PDF dependencies:\n```\npip install PyPDF2 pdfplumber\n```"
+        )
+        return
+
+    col_chunk, col_gen = st.columns([1, 1])
+    with col_chunk:
+        chunk_size = st.slider("Words per chunk", 100, 500, 250, step=50, key="rag_chunk")
+        max_positive = st.slider("Positive examples (chunks)", 4, 12, 8, key="rag_maxpos")
+
+    with col_gen:
+        num_layers = model.num_layers
+        layer = st.slider(
+            "Steering layer",
+            0,
+            num_layers - 1,
+            int(num_layers * 0.65),
+            key="rag_layer",
+        )
+        alpha = st.slider(
+            "Steering strength (α)",
+            0.5,
+            5.0,
+            2.5,
+            step=0.1,
+            key="rag_alpha",
+            help="Higher = model more strongly follows document grounding.",
+        )
+        max_tokens = st.slider("Max new tokens", 30, 300, 150, step=10, key="rag_tokens")
+
+    st.markdown("---")
+    prompt = st.text_input(
+        "Question / Prompt",
+        value="What are the key strategic priorities and recommendations described in this document?",
+        key="rag_prompt",
+        help="Phrase as a completion starter. The grounded model will use document facts.",
+    )
+
+    if st.button("▶  Extract, Steer & Generate", type="primary", key="rag_run"):
+        # Step 1: Extract text from all PDFs
+        all_chunks: List[str] = []
+        with st.spinner("Extracting text from PDF(s) …"):
+            for name, fb in zip(pdf_names, pdf_bytes_list):
+                try:
+                    text = extract_text_from_pdf(fb)
+                    chunks = chunk_text(text, chunk_size=chunk_size)
+                    all_chunks.extend(chunks)
+                    st.caption(f"  {name}: {len(text):,} chars -> {len(chunks)} chunks")
+                except Exception as exc:
+                    st.error(f"Failed to extract text from {name}: {exc}")
+                    return
+
+        if not all_chunks:
+            st.error("No text could be extracted from the selected PDFs.")
+            return
+
+        st.info(f"Total chunks available: **{len(all_chunks)}** — using {max_positive} for steering.")
+
+        # Step 2: Build contrast pairs
+        try:
+            positives, negatives = build_rag_contrast_pairs(
+                all_chunks,
+                max_positive=max_positive,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+
+        with st.expander("Source passages used for steering (positive examples)"):
+            for i, p in enumerate(positives):
+                st.markdown(f"**Chunk {i + 1}:** {_truncate(p, 200)}")
+
+        # Step 3: Discover RAG steering vector
+        with st.spinner("Building document-grounded steering vector …"):
+            t0 = time.time()
+            try:
+                vector, _ = discover_vector(model, positives, negatives, layer)
+                st.session_state["last_vector"] = vector
+                disc_time = time.time() - t0
+            except Exception as exc:
+                st.error(f"Vector discovery failed: {exc}")
+                return
+
+        st.success(
+            f"RAG steering vector ready in **{disc_time:.1f}s** — "
+            f"magnitude: {vector.magnitude:.4f}, layer: {layer}"
+        )
+
+        # Step 4: Generate baseline vs grounded
+        col_base, col_grounded = st.columns(2)
+
+        with col_base:
+            st.subheader("Baseline (no document grounding)")
+            with st.spinner("Generating …"):
+                model.remove_steering()
+                t0 = time.time()
+                baseline = generate_texts(
+                    model,
+                    prompt,
+                    max_new_tokens=max_tokens,
+                    temperature=0.7,
+                    do_sample=True,
+                )
+                base_time = time.time() - t0
+            st.text_area(
+                "Output",
+                value=baseline,
+                height=300,
+                key="rag_baseline_out",
+                disabled=True,
+            )
+            st.caption(f"Generated in {base_time:.1f}s")
+
+        with col_grounded:
+            st.subheader(f"Grounded on: {', '.join(pdf_names)} (α={alpha})")
+            with st.spinner("Generating (document-grounded) …"):
+                model.remove_steering()
+                t0 = time.time()
+                grounded = model.generate_with_steering(
+                    prompt,
+                    vector=vector,
+                    alpha=alpha,
+                    max_new_tokens=max_tokens,
+                    temperature=0.7,
+                    do_sample=True,
+                )
+                grounded_time = time.time() - t0
+            st.text_area(
+                "Output",
+                value=grounded,
+                height=300,
+                key="rag_grounded_out",
+                disabled=True,
+            )
+            st.caption(f"Generated in {grounded_time:.1f}s")
+
+        st.markdown(
+            "> **What to look for**: The grounded output should use terminology, "
+            "facts, and themes from the PDF documents, while the baseline produces "
+            "generic or vague text without document-specific knowledge."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 def main() -> None:
@@ -832,13 +1245,25 @@ def main() -> None:
             st.stop()
         st.warning(
             "Load a model from the sidebar to begin. "
-            "**GPT-2** (~500 MB) works great on CPU for demos."
+            "**GPT-2** (~124 MB, fast download) is the default. "
+            "Switch to `gpt2-large` for better steering quality."
         )
         st.stop()
 
-    tab_play, tab_sweep, tab_comp, tab_insp, tab_layer = st.tabs(
+    # Three primary use-case tabs, then advanced power-user tabs
+    (
+        tab_tone,
+        tab_role,
+        tab_rag,
+        tab_sweep,
+        tab_comp,
+        tab_insp,
+        tab_layer,
+    ) = st.tabs(
         [
-            "🎛️ Playground",
+            "🎭 Tone / Personality",
+            "👔 Role Expertise",
+            "📄 RAG / Document Grounding",
             "📈 Alpha Sweep",
             "🔀 Composition",
             "🔍 Inspector",
@@ -846,8 +1271,12 @@ def main() -> None:
         ]
     )
 
-    with tab_play:
+    with tab_tone:
         _tab_playground(model)
+    with tab_role:
+        _tab_role_expertise(model)
+    with tab_rag:
+        _tab_rag(model)
     with tab_sweep:
         _tab_alpha_sweep(model)
     with tab_comp:
