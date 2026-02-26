@@ -5,6 +5,11 @@
     "context": ".."
   },
 
+  // Explicitly opt out of ALL Codespaces auto-installed features.
+  // Omitting this causes Codespaces to install .NET SDK and other tools
+  // automatically via its default feature set.
+  "features": {},
+
   // 16 vCPU Codespace -- GitHub Codespaces 16-core machine ships with 64 GB RAM.
   // (There is no 16-core/32 GB SKU; the 8-core/32 GB machine is available as an
   //  alternative -- change cpus to 8 and memory to "32gb" if preferred.)

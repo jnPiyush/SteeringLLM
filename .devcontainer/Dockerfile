@@ -1,16 +1,28 @@
 # SteeringLLM Dev Container
-# Python 3.12 on Debian Bookworm -- lightweight base for ML workloads
-FROM mcr.microsoft.com/devcontainers/python:1-3.12-bookworm
+# Plain Python 3.12 on Debian Bookworm -- NO Microsoft devcontainer base image.
+# Using the official Python image avoids the mcr.microsoft.com/devcontainers/python
+# bootstrapping script that auto-installs the .NET SDK.
+FROM python:3.12-bookworm
+
+# Create the non-root vscode user (mirrors what the MS devcontainer base does,
+# but without pulling in .NET or other unneeded toolchains)
+RUN groupadd --gid 1000 vscode \
+    && useradd --uid 1000 --gid vscode --shell /bin/bash --create-home vscode
 
 # System dependencies for PDF processing and general build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     curl \
+    sudo \
+    && echo 'vscode ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/vscode \
     && rm -rf /var/lib/apt/lists/*
 
-# Pre-install PyTorch CPU (avoids re-downloading on every rebuild)
-# CPU-only keeps the image smaller; swap index URL to cu121 for GPU Codespaces
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Pre-install PyTorch CPU (avoids re-downloading on every rebuild).
+# Swap the index URL to cu121 for GPU Codespaces.
 RUN pip install --no-cache-dir \
     torch --index-url https://download.pytorch.org/whl/cpu
 
@@ -29,3 +41,4 @@ RUN pip install --no-cache-dir \
 # Cache directory creation is handled in post-create.sh instead.
 
 WORKDIR /workspaces/SteeringLLM
+USER vscode
