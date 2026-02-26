@@ -1,0 +1,65 @@
+{
+  "name": "SteeringLLM Demo",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // 16 vCPU Codespace -- GitHub Codespaces 16-core machine ships with 64 GB RAM.
+  // (There is no 16-core/32 GB SKU; the 8-core/32 GB machine is available as an
+  //  alternative -- change cpus to 8 and memory to "32gb" if preferred.)
+  "hostRequirements": {
+    "cpus": 16,
+    "memory": "64gb",
+    "storage": "64gb"
+  },
+
+  // VS Code extensions for Python + Jupyter + Git
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        }
+      }
+    }
+  },
+
+  // Ports: Streamlit demo
+  "forwardPorts": [8501],
+  "portsAttributes": {
+    "8501": {
+      "label": "SteeringLLM Demo",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Post-create: install deps + editable package
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // Environment variables
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "HF_HOME": "/workspaces/.cache/huggingface",
+    "TRANSFORMERS_CACHE": "/workspaces/.cache/huggingface/hub",
+    "STREAMLIT_SERVER_HEADLESS": "true",
+    "STREAMLIT_BROWSER_GATHER_USAGE_STATS": "false"
+  },
+
+  // Run as non-root
+  "remoteUser": "vscode"
+}

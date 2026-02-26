@@ -111,7 +111,7 @@ from demo.presets import PRESETS, get_preset, get_preset_names, get_tone_presets
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "gpt2"  # 124M params -- fast CPU download; switch to gpt2-large for quality
+DEFAULT_MODEL = "microsoft/phi-2"  # 2.7B params -- best quality for local CPU steering demos
 VECTOR_DIR = Path("demo/saved_vectors")
 RAG_DATA_DIR = Path("examples/rag-data")  # pre-loaded PDFs for RAG demo
 MAX_VECTORS = 5  # max vectors in composition tab
@@ -464,17 +464,69 @@ def _tab_alpha_sweep(model: Any) -> None:
     st.header("📈 Alpha Sweep")
     st.markdown(
         "Sweep through a range of steering strengths to visualise how alpha "
-        "affects generation output."
+        "affects generation output. Pick a preset or use a vector from the "
+        "Playground tab."
     )
 
-    vec = st.session_state.get("last_vector")
-    if vec is None:
-        st.info("Go to the **Playground** tab and generate a vector first.")
-        return
+    # ---- Vector source: Preset or reuse from Playground ----
+    num_layers = model.num_layers
+    preset_names = get_preset_names()
+
+    vec_source = st.radio(
+        "Vector source",
+        ["Preset", "From Playground"],
+        horizontal=True,
+        key="sw_source",
+    )
+
+    if vec_source == "Preset":
+        sw_col_preset, sw_col_cfg = st.columns([1.2, 0.8])
+        with sw_col_preset:
+            preset_name = st.selectbox(
+                "Preset", preset_names, key="sw_preset"
+            )
+            preset = get_preset(preset_name)
+            st.info(preset["description"])
+            default_prompt = preset.get(
+                "default_prompt", "Tell me about yourself."
+            )
+            with st.expander("View contrast pairs"):
+                cp1, cp2 = st.columns(2)
+                cp1.markdown("**Positive**")
+                for p in preset["positive"]:
+                    cp1.markdown(f"- {_truncate(p, 90)}")
+                cp2.markdown("**Negative**")
+                for n in preset["negative"]:
+                    cp2.markdown(f"- {_truncate(n, 90)}")
+        with sw_col_cfg:
+            default_layer = max(
+                0,
+                min(
+                    int(preset["recommended_layer_pct"] * num_layers),
+                    num_layers - 1,
+                ),
+            )
+            sw_layer = st.slider(
+                "Target layer",
+                0,
+                num_layers - 1,
+                default_layer,
+                key="sw_layer",
+                help="Which transformer layer to extract the steering vector from.",
+            )
+    else:
+        vec_playground = st.session_state.get("last_vector")
+        if vec_playground is None:
+            st.info(
+                "No vector found. Go to the **Playground** tab and generate "
+                "a vector first, or switch to **Preset** above."
+            )
+            return
+        default_prompt = "Tell me about yourself."
 
     prompt = st.text_input(
         "Prompt",
-        value="Tell me about yourself.",
+        value=default_prompt,
         key="sweep_prompt",
     )
 
@@ -486,6 +538,22 @@ def _tab_alpha_sweep(model: Any) -> None:
     max_tokens = st.slider("Max new tokens", 20, 200, 60, key="sw_tok")
 
     if st.button("▶  Run Sweep", type="primary", key="sw_run"):
+        # Resolve the vector
+        if vec_source == "Preset":
+            with st.spinner("Discovering steering vector from preset ..."):
+                vec, _ = discover_vector(
+                    model,
+                    preset["positive"],
+                    preset["negative"],
+                    sw_layer,
+                )
+            st.success(
+                f"Vector discovered -- magnitude: {vec.magnitude:.4f}, "
+                f"dim: {vec.shape[0]}"
+            )
+        else:
+            vec = st.session_state["last_vector"]
+
         alphas = []
         a = alpha_min
         while a <= alpha_max + 1e-9:
@@ -493,7 +561,7 @@ def _tab_alpha_sweep(model: Any) -> None:
             a += alpha_step
 
         results: List[Dict[str, Any]] = []
-        progress = st.progress(0, text="Sweeping …")
+        progress = st.progress(0, text="Sweeping ...")
         for i, a in enumerate(alphas):
             model.remove_steering()
             out = model.generate_with_steering(
@@ -627,41 +695,93 @@ def _tab_composition(model: Any) -> None:
             _, _, _, VectorComposition, _ = _import_lib()
             composed = VectorComposition.weighted_sum(sel_vecs, sel_weights)
             st.session_state["composed_vector"] = composed
-            st.info(
-                f"Composed vector — magnitude: {composed.magnitude:.4f}, "
+            st.success(
+                f"Composed vector -- magnitude: {composed.magnitude:.4f}, "
                 f"layer: {composed.layer}, dim: {composed.shape[0]}"
             )
-
-            # Quick generate
-            prompt = st.text_input(
-                "Test prompt",
-                value="Explain quantum computing.",
-                key="comp_prompt",
+        else:
+            st.info(
+                "Vectors target different layers -- composition requires "
+                "same-layer vectors. Adjust layers above."
             )
-            alpha = st.slider(
-                "α (composed)",
+
+    # ---- Generate with composed vector (persists via session_state) ----
+    composed = st.session_state.get("composed_vector")
+    if composed is not None:
+        st.markdown("---")
+        st.subheader("Generate with Composed Vector")
+        comp_prompt = st.text_input(
+            "Prompt",
+            value="Explain quantum computing.",
+            key="comp_prompt",
+        )
+        comp_c1, comp_c2 = st.columns(2)
+        with comp_c1:
+            comp_alpha = st.slider(
+                "Steering strength (alpha)",
                 -5.0,
                 5.0,
                 2.0,
                 step=0.1,
                 key="comp_alpha",
             )
-            if st.button("Generate with composed vector", key="comp_gen"):
-                model.remove_steering()
-                out = model.generate_with_steering(
-                    prompt,
-                    vector=composed,
-                    alpha=alpha,
-                    max_new_tokens=120,
-                    do_sample=True,
-                    temperature=0.7,
-                )
-                st.text_area("Output", value=out, height=200, disabled=True, key="comp_out")
-        else:
-            st.info(
-                "Vectors target different layers — composition requires "
-                "same-layer vectors. Adjust layers above."
+        with comp_c2:
+            comp_tokens = st.slider(
+                "Max new tokens",
+                20,
+                300,
+                120,
+                step=10,
+                key="comp_max_tok",
             )
+
+        if st.button("▶  Generate with Composed Vector", type="primary", key="comp_gen"):
+            col_base, col_steered = st.columns(2)
+
+            with col_base:
+                st.markdown("**Baseline (no steering)**")
+                with st.spinner("Generating baseline ..."):
+                    model.remove_steering()
+                    t0 = time.time()
+                    baseline_out = generate_texts(
+                        model,
+                        comp_prompt,
+                        max_new_tokens=comp_tokens,
+                        do_sample=True,
+                        temperature=0.7,
+                    )
+                    base_time = time.time() - t0
+                st.text_area(
+                    "Output",
+                    value=baseline_out,
+                    height=250,
+                    disabled=True,
+                    key="comp_base_out",
+                )
+                st.caption(f"Generated in {base_time:.1f}s")
+
+            with col_steered:
+                st.markdown(f"**Composed Steering (alpha = {comp_alpha})**")
+                with st.spinner("Generating steered ..."):
+                    model.remove_steering()
+                    t0 = time.time()
+                    steered_out = model.generate_with_steering(
+                        comp_prompt,
+                        vector=composed,
+                        alpha=comp_alpha,
+                        max_new_tokens=comp_tokens,
+                        do_sample=True,
+                        temperature=0.7,
+                    )
+                    steer_time = time.time() - t0
+                st.text_area(
+                    "Output",
+                    value=steered_out,
+                    height=250,
+                    disabled=True,
+                    key="comp_steer_out",
+                )
+                st.caption(f"Generated in {steer_time:.1f}s")
 
 
 # ---------------------------------------------------------------------------
