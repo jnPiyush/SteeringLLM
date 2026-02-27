@@ -114,7 +114,7 @@ from demo.presets import PRESETS, get_preset, get_preset_names, get_tone_presets
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "gpt2-large"  # 774M params -- good quality for local CPU steering demos
+DEFAULT_MODEL = "gpt2-large"  # 774M params -- good balance of quality & CPU speed
 VECTOR_DIR = Path("demo/saved_vectors")
 RAG_DATA_DIR = Path("examples/rag-data")  # pre-loaded PDFs for RAG demo
 MAX_VECTORS = 5  # max vectors in composition tab
@@ -214,7 +214,7 @@ def _sidebar() -> Optional[Any]:
     model_name = st.sidebar.text_input(
         "HuggingFace Model",
         value=DEFAULT_MODEL,
-        help="Any causal-LM on Hugging Face Hub (e.g. gpt2, gpt2-medium, gpt2-large).",
+        help="Any causal-LM on Hugging Face Hub (e.g. gpt2, gpt2-medium, gpt2-large, gpt2-xl).",
     )
 
     if st.sidebar.button("Load Model", type="primary", use_container_width=True):
@@ -223,7 +223,7 @@ def _sidebar() -> Optional[Any]:
 
     st.sidebar.caption(
         ":bulb: **Tip**: `gpt2` (124 MB) loads fastest. "
-        "Use `gpt2-large` for noticeably better steering quality."
+        "`gpt2-large` (default) is the best balance of quality and speed on CPU."
     )
 
     if "model_name" not in st.session_state:
@@ -1399,8 +1399,8 @@ def main() -> None:
             st.stop()
         st.warning(
             "Load a model from the sidebar to begin. "
-            "**GPT-2** (~124 MB, fast download) is the default. "
-            "Switch to `gpt2-large` for better steering quality."
+            "**GPT-2 Large** (~774M params) is the default. "
+            "Use `gpt2` (124 MB) for faster loading on slower connections."
         )
         st.stop()
 
