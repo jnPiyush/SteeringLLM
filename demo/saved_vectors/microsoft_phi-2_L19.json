@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "model_name": "microsoft/phi-2",
+  "layer": 19,
+  "layer_name": "model.layers.19",
+  "method": "mean_difference",
+  "magnitude": 26.42217445373535,
+  "shape": [
+    2560
+  ],
+  "dtype": "float32",
+  "created_at": "2026-02-26T23:49:08.438224+00:00",
+  "metadata": {
+    "positive_samples": 8,
+    "negative_samples": 8,
+    "batch_size": 8,
+    "max_length": 128
+  }
+}

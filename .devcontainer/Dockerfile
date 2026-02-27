@@ -18,6 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo 'vscode ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers.d/vscode \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Node.js 20 LTS via NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 

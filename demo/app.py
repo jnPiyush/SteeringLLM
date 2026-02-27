@@ -80,6 +80,7 @@ def _ensure_imports() -> bool:
             VectorComposition as _VC,
             get_supported_architectures as _gsa,
         )
+
         _LIB_AVAILABLE = True
     except (ImportError, OSError) as exc:
         _LIB_AVAILABLE = False
@@ -90,6 +91,7 @@ def _ensure_imports() -> bool:
 def _import_torch():
     """Return the torch module (lazy)."""
     import torch
+
     return torch
 
 
@@ -102,6 +104,7 @@ def _import_lib():
         VectorComposition,
         get_supported_architectures,
     )
+
     return Discovery, SteeringModel, SteeringVector, VectorComposition, get_supported_architectures
 
 
@@ -111,7 +114,7 @@ from demo.presets import PRESETS, get_preset, get_preset_names, get_tone_presets
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_MODEL = "microsoft/phi-2"  # 2.7B params -- best quality for local CPU steering demos
+DEFAULT_MODEL = "gpt2-large"  # 774M params -- good quality for local CPU steering demos
 VECTOR_DIR = Path("demo/saved_vectors")
 RAG_DATA_DIR = Path("examples/rag-data")  # pre-loaded PDFs for RAG demo
 MAX_VECTORS = 5  # max vectors in composition tab
@@ -205,9 +208,7 @@ def _sidebar() -> Optional[Any]:
                 "conflict."
             )
         else:
-            st.sidebar.error(
-                f"`steering_llm` is not importable.\n\n```\n{_LIB_ERROR}\n```"
-            )
+            st.sidebar.error(f"`steering_llm` is not importable.\n\n```\n{_LIB_ERROR}\n```")
         return None
 
     model_name = st.sidebar.text_input(
@@ -250,8 +251,7 @@ def _sidebar() -> Optional[Any]:
 
     st.sidebar.markdown("---")
     st.sidebar.markdown(
-        "### Supported architectures\n"
-        + ", ".join(f"`{a}`" for a in get_supported_architectures())
+        "### Supported architectures\n" + ", ".join(f"`{a}`" for a in get_supported_architectures())
     )
 
     return model
@@ -283,7 +283,9 @@ def _tab_playground(model: Any) -> None:
             st.info(preset["description"])
             positive = preset["positive"]
             negative = preset["negative"]
-            default_prompt = preset.get("default_prompt", "Tell me about yourself and how you see the world.")
+            default_prompt = preset.get(
+                "default_prompt", "Tell me about yourself and how you see the world."
+            )
 
             with st.expander("View contrast pairs"):
                 c1, c2 = st.columns(2)
@@ -307,12 +309,8 @@ def _tab_playground(model: Any) -> None:
                 key="pg_neg",
                 placeholder="I hate this.\nYou're terrible.",
             )
-            positive = [
-                s.strip() for s in positive_text.strip().splitlines() if s.strip()
-            ]
-            negative = [
-                s.strip() for s in negative_text.strip().splitlines() if s.strip()
-            ]
+            positive = [s.strip() for s in positive_text.strip().splitlines() if s.strip()]
+            negative = [s.strip() for s in negative_text.strip().splitlines() if s.strip()]
             default_prompt = "Tell me about yourself and how you see the world."
 
     # ---- Configuration ----
@@ -456,6 +454,17 @@ def _tab_playground(model: Any) -> None:
             vec.save(str(save_path))
             st.success(f"Saved to `{save_path}.json` / `.pt`")
 
+    # ---- Guidance ----
+    st.divider()
+    st.markdown(
+        "> **What to look for**: Compare the two outputs side by side. "
+        "The steered output should reflect the tone of the selected preset "
+        "(e.g. more positive, formal, or concise) while the baseline stays "
+        "neutral. Watch for changes in word choice, sentence structure, and "
+        "emotional tone. Increase alpha to amplify the effect or decrease it "
+        "if the output becomes incoherent."
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tab 2 — Alpha Sweep
@@ -482,14 +491,10 @@ def _tab_alpha_sweep(model: Any) -> None:
     if vec_source == "Preset":
         sw_col_preset, sw_col_cfg = st.columns([1.2, 0.8])
         with sw_col_preset:
-            preset_name = st.selectbox(
-                "Preset", preset_names, key="sw_preset"
-            )
+            preset_name = st.selectbox("Preset", preset_names, key="sw_preset")
             preset = get_preset(preset_name)
             st.info(preset["description"])
-            default_prompt = preset.get(
-                "default_prompt", "Tell me about yourself."
-            )
+            default_prompt = preset.get("default_prompt", "Tell me about yourself.")
             with st.expander("View contrast pairs"):
                 cp1, cp2 = st.columns(2)
                 cp1.markdown("**Positive**")
@@ -548,8 +553,7 @@ def _tab_alpha_sweep(model: Any) -> None:
                     sw_layer,
                 )
             st.success(
-                f"Vector discovered -- magnitude: {vec.magnitude:.4f}, "
-                f"dim: {vec.shape[0]}"
+                f"Vector discovered -- magnitude: {vec.magnitude:.4f}, " f"dim: {vec.shape[0]}"
             )
         else:
             vec = st.session_state["last_vector"]
@@ -576,6 +580,17 @@ def _tab_alpha_sweep(model: Any) -> None:
 
         progress.empty()
         st.dataframe(results, use_container_width=True, hide_index=True)
+
+    # ---- Guidance ----
+    st.divider()
+    st.markdown(
+        "> **What to look for**: Scan the table from negative alpha to positive. "
+        "At alpha = 0 the output matches the unsteered baseline. As alpha grows "
+        "positive, the preset behavior should intensify (e.g. more formal, more "
+        "creative). Negative alpha should push the output in the opposite direction. "
+        "Note the 'sweet spot' where the effect is clear but the text remains "
+        "fluent -- beyond that the output often degrades into repetition or nonsense."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -648,9 +663,7 @@ def _tab_composition(model: Any) -> None:
         progress = st.progress(0, text="Discovering vectors …")
         for i in range(num_vectors):
             cfg = st.session_state[f"_comp_cfg_{i}"]
-            vec, _ = discover_vector(
-                model, cfg["positive"], cfg["negative"], cfg["layer"]
-            )
+            vec, _ = discover_vector(model, cfg["positive"], cfg["negative"], cfg["layer"])
             vectors.append(vec)
             progress.progress((i + 1) / num_vectors)
         progress.empty()
@@ -677,18 +690,13 @@ def _tab_composition(model: Any) -> None:
             if conflicts:
                 st.warning(
                     "Conflicts detected: "
-                    + ", ".join(
-                        f"V{a + 1}↔V{b + 1} (sim={s:.3f})"
-                        for a, b, s in conflicts
-                    )
+                    + ", ".join(f"V{a + 1}↔V{b + 1} (sim={s:.3f})" for a, b, s in conflicts)
                 )
             else:
                 st.success("No conflicts detected between same-layer vectors.")
 
         # 4. Compose (same-layer only)
-        same_layer_indices = [
-            i for i, v in enumerate(vectors) if v.layer == vectors[0].layer
-        ]
+        same_layer_indices = [i for i, v in enumerate(vectors) if v.layer == vectors[0].layer]
         if len(same_layer_indices) >= 2:
             sel_vecs = [vectors[i] for i in same_layer_indices]
             sel_weights = [weights[i] for i in same_layer_indices]
@@ -783,15 +791,24 @@ def _tab_composition(model: Any) -> None:
                 )
                 st.caption(f"Generated in {steer_time:.1f}s")
 
+    # ---- Guidance ----
+    st.divider()
+    st.markdown(
+        "> **What to look for**: Check the cosine-similarity matrix first -- "
+        "high similarity (> 0.5) between vectors means they reinforce each other; "
+        "negative similarity indicates conflicting directions that may cancel out. "
+        "Compare the composed-steered output against the baseline: you should see "
+        "a blend of all selected behaviors. If one vector dominates, try adjusting "
+        "its weight or reducing alpha."
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tab 4 — Vector Inspector
 # ---------------------------------------------------------------------------
 def _tab_inspector(model: Any) -> None:
     st.header("🔍 Vector Inspector")
-    st.markdown(
-        "Examine a steering vector's metadata, statistics, and load saved vectors."
-    )
+    st.markdown("Examine a steering vector's metadata, statistics, and load saved vectors.")
 
     vec = st.session_state.get("last_vector")
     composed = st.session_state.get("composed_vector")
@@ -899,10 +916,7 @@ def _tab_inspector(model: Any) -> None:
         export_meta["metadata"] = target_vec.metadata
     json_bytes = json.dumps(export_meta, indent=2).encode("utf-8")
 
-    tag = (
-        f"{target_vec.model_name.replace('/', '_')}"
-        f"_L{target_vec.layer}_{target_vec.method}"
-    )
+    tag = f"{target_vec.model_name.replace('/', '_')}" f"_L{target_vec.layer}_{target_vec.method}"
     with exp_col1:
         st.download_button(
             label="Download vector (JSON)",
@@ -925,6 +939,18 @@ def _tab_inspector(model: Any) -> None:
             key="insp_dl_npy",
         )
 
+    # ---- Guidance ----
+    st.divider()
+    st.markdown(
+        "> **What to look for**: A healthy steering vector has a roughly "
+        "bell-shaped (normal) distribution of values centered near zero. "
+        "Large magnitude (> 50) suggests a strong directional signal. "
+        "Extremely skewed distributions or outlier spikes may indicate "
+        "overfitting to a single contrast pair. Use this tab to compare "
+        "vectors from different presets or layers and verify they capture "
+        "distinct behavioral directions."
+    )
+
 
 # ---------------------------------------------------------------------------
 # Tab 5 — Layer Explorer
@@ -937,9 +963,7 @@ def _tab_layer_explorer(model: Any) -> None:
     )
 
     # Use current preset to build vectors
-    preset_name = st.selectbox(
-        "Preset", get_preset_names(), key="le_preset"
-    )
+    preset_name = st.selectbox("Preset", get_preset_names(), key="le_preset")
     preset = get_preset(preset_name)
     prompt = st.text_input(
         "Prompt",
@@ -969,9 +993,7 @@ def _tab_layer_explorer(model: Any) -> None:
         progress = st.progress(0, text="Sweeping layers …")
 
         for i, lay in enumerate(layers_to_test):
-            vec, _ = discover_vector(
-                model, preset["positive"], preset["negative"], lay
-            )
+            vec, _ = discover_vector(model, preset["positive"], preset["negative"], lay)
             model.remove_steering()
             out = model.generate_with_steering(
                 prompt,
@@ -980,15 +1002,28 @@ def _tab_layer_explorer(model: Any) -> None:
                 max_new_tokens=max_tokens,
                 do_sample=False,
             )
-            results.append({
-                "Layer": lay,
-                "Magnitude": f"{vec.magnitude:.4f}",
-                "Output": out,
-            })
+            results.append(
+                {
+                    "Layer": lay,
+                    "Magnitude": f"{vec.magnitude:.4f}",
+                    "Output": out,
+                }
+            )
             progress.progress((i + 1) / len(layers_to_test))
 
         progress.empty()
         st.dataframe(results, use_container_width=True, hide_index=True)
+
+    # ---- Guidance ----
+    st.divider()
+    st.markdown(
+        "> **What to look for**: Middle-to-upper layers (roughly 50-75%% of total) "
+        "typically produce the strongest behavioral steering while keeping text "
+        "fluent. Early layers often show little effect because they encode low-level "
+        "syntax. The very last layers may hurt fluency. Compare vector magnitude "
+        "across layers -- higher magnitude does not always mean better steering. "
+        "The best layer balances clear behavioral change with coherent output."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1046,12 +1081,8 @@ def _tab_role_expertise(model: Any) -> None:
             key="role_alpha",
             help="Higher α = stronger expert persona. Too high may cause repetition.",
         )
-        max_tokens = st.slider(
-            "Max new tokens", 30, 300, 150, step=10, key="role_tokens"
-        )
-        temperature = st.slider(
-            "Temperature", 0.1, 2.0, 0.7, step=0.05, key="role_temp"
-        )
+        max_tokens = st.slider("Max new tokens", 30, 300, 150, step=10, key="role_tokens")
+        temperature = st.slider("Temperature", 0.1, 2.0, 0.7, step=0.05, key="role_temp")
 
     st.markdown("---")
     default_prompt = preset.get("default_prompt", "Explain your area of expertise.")
@@ -1065,9 +1096,7 @@ def _tab_role_expertise(model: Any) -> None:
     if st.button("▶  Generate", type="primary", key="role_run"):
         with st.spinner("Discovering role steering vector …"):
             t0 = time.time()
-            vector, _ = discover_vector(
-                model, preset["positive"], preset["negative"], layer
-            )
+            vector, _ = discover_vector(model, preset["positive"], preset["negative"], layer)
             st.session_state["last_vector"] = vector
             disc_time = time.time() - t0
 
@@ -1143,9 +1172,10 @@ def _tab_rag(model: Any) -> None:
     )
 
     # ---- PDF source selection ----
+    # Default to pre-loaded samples so users see the rag-data files immediately
     source_mode = st.radio(
         "Document source",
-        ["Upload PDF(s)", "Use pre-loaded sample PDFs"],
+        ["Use pre-loaded sample PDFs", "Upload PDF(s)"],
         horizontal=True,
         key="rag_source_mode",
     )
@@ -1153,7 +1183,28 @@ def _tab_rag(model: Any) -> None:
     pdf_bytes_list: List[bytes] = []
     pdf_names: List[str] = []
 
-    if source_mode == "Upload PDF(s)":
+    if source_mode == "Use pre-loaded sample PDFs":
+        # Use pre-loaded PDFs from examples/rag-data/
+        available_pdfs = sorted(RAG_DATA_DIR.glob("*.pdf")) if RAG_DATA_DIR.exists() else []
+        if not available_pdfs:
+            st.warning(
+                f"No PDFs found in `{RAG_DATA_DIR}`. " "Upload a PDF using the other source mode."
+            )
+        else:
+            # Show file details so users know what they are picking
+            st.caption(f"Found **{len(available_pdfs)}** PDF(s) in `examples/rag-data/`:")
+            selected_names = st.multiselect(
+                "Select PDF(s) to use",
+                [p.name for p in available_pdfs],
+                default=[available_pdfs[0].name],
+                key="rag_preloaded_select",
+                help="Pick one or more pre-loaded documents to ground the model on.",
+            )
+            for name in selected_names:
+                path = RAG_DATA_DIR / name
+                pdf_bytes_list.append(path.read_bytes())
+                pdf_names.append(name)
+    else:
         uploaded = st.file_uploader(
             "Upload one or more PDF files",
             type=["pdf"],
@@ -1164,25 +1215,6 @@ def _tab_rag(model: Any) -> None:
             for f in uploaded:
                 pdf_bytes_list.append(f.read())
                 pdf_names.append(f.name)
-    else:
-        # Use pre-loaded PDFs from examples/rag-data/
-        available_pdfs = sorted(RAG_DATA_DIR.glob("*.pdf")) if RAG_DATA_DIR.exists() else []
-        if not available_pdfs:
-            st.warning(
-                f"No PDFs found in `{RAG_DATA_DIR}`. "
-                "Upload a PDF using the other source mode."
-            )
-        else:
-            selected_names = st.multiselect(
-                "Select PDF(s) to use",
-                [p.name for p in available_pdfs],
-                default=[available_pdfs[0].name],
-                key="rag_preloaded_select",
-            )
-            for name in selected_names:
-                path = RAG_DATA_DIR / name
-                pdf_bytes_list.append(path.read_bytes())
-                pdf_names.append(name)
 
     if not pdf_bytes_list:
         st.info("Select or upload at least one PDF to continue.")
@@ -1233,7 +1265,7 @@ def _tab_rag(model: Any) -> None:
     st.markdown("---")
     prompt = st.text_input(
         "Question / Prompt",
-        value="What are the key strategic priorities and recommendations described in this document?",
+        value="What are the Microsoft solution plays?",
         key="rag_prompt",
         help="Phrase as a completion starter. The grounded model will use document facts.",
     )
@@ -1256,7 +1288,9 @@ def _tab_rag(model: Any) -> None:
             st.error("No text could be extracted from the selected PDFs.")
             return
 
-        st.info(f"Total chunks available: **{len(all_chunks)}** — using {max_positive} for steering.")
+        st.info(
+            f"Total chunks available: **{len(all_chunks)}** — using {max_positive} for steering."
+        )
 
         # Step 2: Build contrast pairs
         try:

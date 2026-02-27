@@ -12,9 +12,7 @@ from typing import Any, Dict, List
 PRESETS: Dict[str, Dict[str, Any]] = {
     "Positive / Helpful": {
         "category": "tone",
-        "description": (
-            "Steer the model toward positive, helpful, and encouraging tone."
-        ),
+        "description": ("Steer the model toward positive, helpful, and encouraging tone."),
         "default_prompt": (
             "I'm feeling overwhelmed with my workload and don't know where to start. What should I do?"
         ),
@@ -43,9 +41,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "Formal / Professional": {
         "category": "tone",
-        "description": (
-            "Steer the model toward formal, professional language."
-        ),
+        "description": ("Steer the model toward formal, professional language."),
         "default_prompt": (
             "Summarize the key findings from our quarterly performance report and recommend next steps."
         ),
@@ -74,9 +70,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "Concise / Direct": {
         "category": "tone",
-        "description": (
-            "Steer the model toward short, concise, direct responses."
-        ),
+        "description": ("Steer the model toward short, concise, direct responses."),
         "default_prompt": (
             "What are the three most important things to know about machine learning?"
         ),
@@ -107,12 +101,8 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "Creative / Imaginative": {
         "category": "tone",
-        "description": (
-            "Steer the model toward creative, imaginative, and vivid language."
-        ),
-        "default_prompt": (
-            "Describe what it would feel like to travel through a black hole."
-        ),
+        "description": ("Steer the model toward creative, imaginative, and vivid language."),
+        "default_prompt": ("Describe what it would feel like to travel through a black hole."),
         "positive": [
             "Imagine a world where raindrops sing melodies as they fall.",
             "The ancient library whispered secrets to those who listened.",
@@ -138,9 +128,7 @@ PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "Safety / Harmless": {
         "category": "tone",
-        "description": (
-            "Steer the model toward safe, harmless, responsible outputs."
-        ),
+        "description": ("Steer the model toward safe, harmless, responsible outputs."),
         "default_prompt": (
             "Someone is asking about how to handle a dangerous chemical spill at home."
         ),
@@ -166,6 +154,38 @@ PRESETS: Dict[str, Dict[str, Any]] = {
         ],
         "recommended_layer_pct": 0.55,
         "default_alpha": 3.0,
+    },
+    "Sympathetic / Empathetic": {
+        "category": "tone",
+        "description": (
+            "Steer the model toward warm, sympathetic, and emotionally "
+            "supportive responses that validate feelings and show genuine care."
+        ),
+        "default_prompt": (
+            "A colleague just told me they lost a family member and are struggling to cope."
+        ),
+        "positive": [
+            "I'm truly sorry you're going through this. I'm here for you.",
+            "That sounds incredibly difficult. Your feelings are completely valid.",
+            "I can only imagine how hard this must be. Please take all the time you need.",
+            "Thank you for sharing that with me. It takes courage to open up.",
+            "I hear you, and I want you to know you're not alone in this.",
+            "It's completely okay to feel overwhelmed right now. Be gentle with yourself.",
+            "I wish I could take away the pain. Please let me know how I can support you.",
+            "Your feelings matter, and it's natural to grieve. There is no right or wrong way.",
+        ],
+        "negative": [
+            "Stop being so dramatic. Everyone goes through hard times.",
+            "Just get over it already. Life moves on.",
+            "That's not a big deal. You're overreacting.",
+            "I don't have time for this. Figure it out yourself.",
+            "Other people have it way worse than you.",
+            "Crying won't solve anything. Toughen up.",
+            "Why are you still upset about that? It happened ages ago.",
+            "You're being too sensitive. Just move on.",
+        ],
+        "recommended_layer_pct": 0.6,
+        "default_alpha": 2.5,
     },
     "Doctor / Medical Professional": {
         "category": "role",

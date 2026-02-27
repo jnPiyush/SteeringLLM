@@ -49,6 +49,8 @@ def main() -> None:
         app_path,
         "--server.headless", "true",
         "--server.port", str(args.port),
+        "--server.enableCORS", "false",
+        "--server.enableXsrfProtection", "false",
         "--browser.gatherUsageStats", "false",
     ]
 
